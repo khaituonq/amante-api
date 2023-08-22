@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="theme">
+    <select id="get_list_count">
+        SELECT 
+            COUNT(*) AS count 
+        FROM wt_theme 
+        WHERE
+            use_yn = 'Y' 
+            AND del_yn='N'
+        <if test="stat == 2">
+            AND <![CDATA[(theme_state = 2 OR e_date < date_format(NOW(), '%Y-%m-%d %H:%i' ))]]>
+        </if>
+        <if test="stat != 2">
+            AND theme_state in ('0', '1') 
+            AND <![CDATA[ e_date >= date_format(NOW(), '%Y-%m-%d %H:%i' )]]>
+        </if>
+        <if test="main_yn == 'Y'">
+            AND main_yn = 'Y'
+        </if>
+        <if test="shopping_yn == 'Y'">
+            AND shopping_yn = 'Y'
+        </if>
+        <if test="shopping_main_yn == 'Y'">
+            AND (shopping_yn = 'Y' OR main_yn = 'Y')
+        </if>
+        <if test="theme_type == 4">
+            AND theme_type == '4'
+        </if>
+        ORDER BY od ASC
+    </select>
+
+    <select id="get_banner">
+         SELECT * FROM wt_banner
+                WHERE banner_cd = #{banner_cd}
+                AND use_yn = 'Y'
+                AND <![CDATA[display_Sdate < date_format(NOW(), '%Y-%m-%d %H:%i' )]]> 
+                AND <![CDATA[display_Edate > date_format(NOW(), '%Y-%m-%d %H:%i' )]]>
+    </select>
+
+    <select id="get_theme_relation_list">
+        select tb1.*
+        , tb2.product_cd, tb2.product_nm, tb2.product_state, tb2.supply_price, tb2.sale_price, tb2.discount_gb, tb2.fee_rate, tb2.product_cd, tb2.icon
+        , tb3.*
+		, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od, product_file_seq LIMIT 1 ) AS product_main_img
+		, (select count(*) from wt_use_review where product_cd = tb2.product_cd and use_yn = 'Y') as review_cnt
+		, ifnull((select round(avg(POINT),1) from wt_use_review where product_cd = tb2.product_cd),0) as review_avg_point
+        ,(SELECT theme_gubun_nm FROM wt_theme_gubun WHERE theme_seq = tb1.theme_seq AND theme_gubun_cd = tb1.relation_theme_gubun AND use_yn = 'Y') AS theme_gubun_nm
+        ,(SELECT back_ground_color FROM wt_theme_gubun WHERE theme_seq = tb1.theme_seq AND theme_gubun_cd = tb1.relation_theme_gubun AND use_yn = 'Y') AS theme_gubun_background_color
+        ,(SELECT file_nm1 FROM wt_theme_gubun WHERE theme_seq = tb1.theme_seq AND theme_gubun_cd = tb1.relation_theme_gubun AND use_yn = 'Y') AS theme_gubun_file
+        from wt_theme_relation tb1, wt_product tb2, wt_theme tb3
+        where tb1.relation_product_cd = tb2.product_cd
+        and tb1.theme_seq = tb3.theme_seq
+        and tb1.theme_seq = #{theme_seq}
+        AND tb2.product_type = 'N'
+        AND tb2.product_state not in ('3')
+        AND tb2.del_yn ='N'
+        ORDER BY tb1.relation_theme_gubun ASC, relation_seq asc
+        <if test="type != ''">
+            LIMIT 0, 3
+        </if>
+    </select>
+
+    <select id="get_promotion">
+        SELECT 
+            event_seq, 
+            event_nm, 
+            LEFT(s_date, 10) AS s_date, 
+            LEFT(e_date, 10) AS e_date, 
+            file_nm1, 
+            link_url, 
+            event_gb, 
+            content 
+        FROM 
+            wt_event
+        WHERE 
+            use_yn = 'Y'
+            AND del_yn = 'N'
+            <if test="state == 2">
+                AND <![CDATA[(event_state = 2 OR e_date < date_format(NOW(), '%Y-%m-%d %H:%i' ))]]>
+            </if>
+            <if test="state != 2">
+                AND <![CDATA[(event_state = 1 OR e_date >= date_format(NOW(), '%Y-%m-%d %H:%i' ))]]>
+            </if>
+        ORDER BY od ASC
+    </select>
+
+    <select id="get_event_after">
+        SELECT tb1.*, tb2.file_nm1, DATE_FORMAT(tb2.s_date, '%y.%m.%d') AS s_date, DATE_FORMAT(tb2.e_date, '%y.%m.%d') AS e_date
+        FROM wt_event_after tb1, wt_event tb2
+        WHERE tb1.event_seq = tb2.event_seq
+            AND tb1.use_yn ='Y'
+            AND tb1.del_yn ='N'
+        ORDER BY tb1.od DESC 
+    </select>
+
+    <select id="get_list">
+        SELECT
+			theme_seq, 
+            theme_nm, 
+            LEFT(s_date, 10) AS s_date, 
+            LEFT(e_date, 10) AS e_date, 
+            file_nm1, 
+            file_nm2, 
+            link_url, 
+            theme_gb, 
+            content, 
+            theme_con
+		FROM
+			wt_theme
+		WHERE
+			use_yn = 'Y' AND del_yn='N'
+        <if test="stat == 2">
+            AND <![CDATA[(theme_state = 2 OR e_date < date_format(NOW(), '%Y-%m-%d %H:%i' ))]]>
+        </if>
+        <if test="stat != 2">
+            AND <![CDATA[theme_state in ('0', '1') and s_date <= date_format(NOW(), '%Y-%m-%d %H:%i' ) and e_date >= date_format(NOW(), '%Y-%m-%d %H:%i' )]]>
+        </if>
+        <if test="main_yn == 'Y'">
+            AND main_yn = 'Y'
+        </if>
+        <if test="shopping_yn == 'Y'">
+            AND shopping_yn = 'Y'
+        </if>
+        <if test="shopping_main_yn == 'Y'">
+            AND (shopping_yn = 'Y' OR main_yn = 'Y')
+        </if>
+        <if test="theme_type == 4">
+            AND theme_type == '4'
+        </if>
+        ORDER BY od ASC
+        <if test="state == 'init'">
+            LIMIT 0, #{row_count}
+        </if>
+        <if test="state != 'init' && stat != null">
+            LIMIT #{start_num}, #{row_count}
+        </if>
+    </select>
+</mapper>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//reviewEN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="keyword">
+
+  <select id="insert_keyword">
+    INSERT INTO wt_keyword_history (keyword, cust_seq, session_id, path_gb, reg_date) VALUES (#{keyword}, #{cust_seq}, #{session_id}, #{path_gb}, NOW())
+  </select>
+
+
+  <select id="get_keyword_list">
+    SELECT *
+    FROM
+      wt_keyword_history
+    WHERE 
+      session_id = #{session_id}
+      AND del_yn = 'N'
+    GROUP BY keyword
+    ORDER BY keyword_seq DESC
+    LIMIT 10
+  </select>
+
+
+  <select id="del_keyword">
+    UPDATE wt_keyword_history
+    SET del_yn = 'Y'
+    WHERE keyword_seq=#{keyword_seq} 
+      AND session_id=#{session_id}
+  </select>
+
+
+  <select id="del_all_keyword">
+  UPDATE wt_keyword_history
+    SET del_yn = 'Y'
+    WHERE session_id=#{session_id}
+  </select>
+</mapper>

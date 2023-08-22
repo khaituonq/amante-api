@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//reviewEN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="qna">
+  <select id="get_product_count">
+     SELECT
+      COUNT(*) AS count
+    FROM
+      wt_board, wt_code2 tb2
+    WHERE
+      tb2.code_cd2 = wt_board.code_gb AND
+      sort = 'counsel' AND
+      product_cd = #{product_cd} AND
+      del = 'N' AND
+      wt_board.show = 'Y'
+  </select>
+
+  <select id="get_product_list">
+    SELECT
+      wt_board.*, tb2.code_nm2
+    FROM
+      wt_board, wt_code2 tb2
+    WHERE
+      tb2.code_cd2 = wt_board.code_gb AND
+      sort = 'counsel' AND
+      product_cd = #{product_cd} AND
+      del = 'N' AND
+      wt_board.show = 'Y'
+    ORDER BY
+      od ASC
+    LIMIT ${start_num}, ${row_count}
+  </select>
+</mapper>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="log">
+    <insert id="insert_talk_log">
+        INSERT INTO wt_talk_log 
+        SET
+            <if test="template_cd != '' || template_cd != null">
+                template_cd = #{template_cd} ,
+            </if>
+            code = #{code},
+            phn = #{phn},
+            type = #{type},
+            msgid = #{msgid},
+            message = #{message},
+            originMessge = #{originMessge},
+            send_msg = #{send_msg},
+            reg_date = #{reg_date}
+    </insert>
+
+    <select id="get_talk_template">
+        SELECT * FROM wt_talk_template WHERE template_cd =  #{template_cd} AND use_yn = 'Y'
+    </select>
+
+    <select id="get_member_info">
+        SELECT tb1.*
+					, tb2.mem_addr_seq
+					,(SELECT member_grp_nm FROM wt_member_grp WHERE member_grp_cd = tb1.member_grp_cd ) AS member_grp_nm
+                    , tb1.phone
+					, SUBSTRING(tb1.phone,1,3) AS phone1
+					, SUBSTRING(tb1.phone,4,4) AS phone2
+					, SUBSTRING(tb1.phone,8,4) AS phone3
+					, SUBSTRING_INDEX(tb1.email,'@',1) AS email_id
+					, SUBSTRING_INDEX(tb1.email,'@',-1) AS email_addr
+					FROM wt_member tb1
+					LEFT JOIN wt_member_addr tb2 ON tb2.cust_seq = tb1.cust_seq AND tb2.default_yn = 'Y'
+					WHERE tb1.cust_seq = #{cust_seq}
+    </select>
+
+    <select id="get_sms_order_info">
+        SELECT
+            tb1.*,
+            tb2.vact_num,
+            tb2.vact_nm,
+            tb2.tid,
+            ( SELECT otype_nm FROM wt_order_otype WHERE otype_cd = tb1.otype_cd ) otype_nm,
+            ( SELECT order_state_nm FROM wt_order_state WHERE order_state_cd = tb1.order_state_cd ) order_state_nm,
+            ( SELECT cancel_price FROM wt_order_part_cancel WHERE tb1.ocode = tb2.ocode ORDER BY part_cancel_seq DESC LIMIT 1 ) AS part_cancel_price 
+        FROM
+            wt_order_info tb1
+            LEFT OUTER JOIN wt_card tb2 ON tb1.ocode = tb2.ocode
+        <if test="ocode != '' || ocode != null">
+            WHERE tb1.ocode = #{ocode}
+        </if>
+    </select>
+
+    <select id="get_order_info_refund">
+        select tb1.*, (select product_nm from wt_order_product where product_ocode = tb2.product_ocode) as product_nm
+				from wt_order_info tb1 left outer join wt_order_refund tb2
+				on tb1.ocode = tb2.ocode
+				where tb2.refund_seq = ${refund_seq}
+    </select>
+
+    <select id="get_restock_info">
+        SELECT *
+                    , ( SELECT product_nm FROM wt_product WHERE product_cd = tb1.product_cd ) AS product_nm
+                    , ( SELECT opt_nm2 FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb2.opt_val1 AND product_cd = tb2.product_cd ) AS opt_nm2_1
+                    , ( SELECT opt_nm2 FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb2.opt_val2 AND product_cd = tb2.product_cd ) AS opt_nm2_2
+                    , ( SELECT opt_nm2 FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb2.opt_val3 AND product_cd = tb2.product_cd ) AS opt_nm2_3
+                    , ( SELECT opt_nm2 FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb2.opt_cd2 AND product_cd = tb2.product_cd ) AS opt_nm2_4
+                 FROM wt_product_alram tb1
+                 INNER JOIN wt_product_stock tb2 ON tb2.stock_seq = tb1.stock_seq
+                 WHERE tb1.alram_seq = #{alarm_seq}
+    </select>
+
+</mapper>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//reviewEN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="promotion">
+    <!-- <select id="get_list">
+        SELECT
+			event_seq, event_nm, LEFT(s_date, 10) AS s_date, LEFT(e_date, 10) AS e_date, file_nm1, link_url, event_gb, $select_content
+		FROM
+			wt_event 
+		WHERE
+		    use_yn = 'Y' AND del_yn='N' 
+            
+        
+		ORDER BY
+		    od ASC 
+        <if test="row_count > 0 and start_num >= 0">
+                    LIMIT ${start_num}, ${row_count}
+        </if>
+    </select> -->
+     <select id="get_list">
+       SELECT
+			event_seq, event_nm, LEFT(s_date, 10) AS s_date, LEFT(e_date, 10) AS e_date, file_nm1, link_url, event_gb, content
+		FROM
+			wt_event 
+		WHERE
+		    use_yn = 'Y' AND del_yn='N' 
+        <if test="stat == 2">
+                    AND (event_state = 2 AND e_date < NOW())
+        </if>
+        <if test="stat != 2">
+                    AND (event_state = 1 AND e_date >= NOW())
+        </if>
+            
+		ORDER BY
+		    od ASC 
+        <if test="row_count > 0 and start_num >= 0">
+                    LIMIT ${start_num}, ${row_count}
+        </if>
+    </select>
+
+    <select id="get_view">
+        SELECT
+            event_seq, event_nm, LEFT(s_date, 10) AS s_date, LEFT(e_date, 10) AS e_date, file_nm1, link_url, event_state, content, event_type
+        FROM
+            wt_event 
+        WHERE
+            ( (event_state = '0' AND use_yn = 'N') OR use_yn = 'Y' ) AND del_yn='N' AND event_seq = #{event_seq}
+    </select>
+
+    <select id="get_comment_cnt">
+        SELECT COUNT(*) AS cnt FROM wt_event_board WHERE event_seq = #{event_seq} AND use_yn = 'Y' AND admin_reply_yn <> 'A'
+    </select>
+
+    <select id="insert_comment">
+		INSERT
+			wt_event_board
+		SET
+			event_seq = #{event_seq},
+			user_id = #{user_id},
+			user_nm = #{user_nm},
+			cust_seq = #{cust_seq},
+			title = #{title},
+            content = #{content},
+            reg_ip = #{reg_ip},
+			reg_date = now()
+	</select>
+
+    <select id="get_comment_list">
+       SELECT
+                            tb1.event_board_seq, tb1.user_id, tb1.user_nm, tb1.content, tb1.reg_date, tb1.cust_seq, 
+                            tb1.file_nm1, tb2.file_nm1 AS event_img, tb2.event_type, tb1.title, tb1.secret_yn,
+                            tb1.admin_reply_yn, tb1.hit
+                            ,(SELECT content FROM wt_event_board WHERE tb1.event_board_seq = admin_eb_seq AND admin_reply_yn ='A') AS admin_reply
+                            ,(SELECT user_id FROM wt_event_board WHERE tb1.event_board_seq = admin_eb_seq AND admin_reply_yn ='A') AS admin_id
+                        	,(SELECT user_nm FROM wt_event_board WHERE tb1.event_board_seq = admin_eb_seq AND admin_reply_yn ='A') AS admin_nm
+                        	,(SELECT reg_date FROM wt_event_board WHERE tb1.event_board_seq = admin_eb_seq AND admin_reply_yn ='A') AS reply_date
+                            ,(SELECT COUNT(*) FROM wt_like_info WHERE tb1.event_board_seq = ref_seq AND sort='event' AND gubun='L' ) AS like_cnt
+                        FROM
+                            wt_event_board AS tb1, wt_event AS tb2
+                        WHERE
+                            tb1.use_yn = 'Y' AND tb1.event_seq = #{event_seq} AND tb1.event_seq = tb2.event_seq AND tb1.admin_reply_yn <> 'A'
+                            $sh_query
+                    <if test="key != null && key != '' && keyword != null && keyword != ''">
+						    AND tb1.${key} like '%${keyword}'
+					</if>
+                        ORDER BY tb1.reg_date DESC
+                    <if test="row_count > 0 and start_num >= 0">
+                        LIMIT ${start_num}, ${row_count}
+                    </if>
+    </select>
+
+</mapper>

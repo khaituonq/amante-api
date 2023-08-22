@@ -1,0 +1,1068 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="order">
+
+
+	<!--
+	/**
+     * 주문상품
+     */
+	 -->
+	<select id="get_list">
+		SELECT tb1.* , tb2.product_nm , tb2.product_type , tb2.supply_price
+					, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS main_img
+					, sp_product_price(tb2.product_cd, tb1.qty, #{member_grp_cd}) as sale_price
+					, tb2.sale_price as sale_price_origin
+					, tb2.free_trans_yn, tb2.fee_rate, tb2.reserve_rate
+					, tb2.coupon_use_yn, tb2.reserve_use_yn, tb2.reserve_give_yn
+
+					, ( SELECT COUNT(*) as opt_cnt
+						FROM wt_product_opt1 a, wt_product_opt2 b
+					   WHERE a.opt_cd1 = b.opt_cd1
+						 AND a.product_cd = b.product_cd
+						 AND a.use_yn = 'Y'
+						 AND b.use_yn = 'Y'
+						 AND a.product_cd = tb1.product_cd ) opt_cnt
+		FROM wt_cart tb1, wt_product tb2
+		WHERE tb1.product_cd = tb2.product_cd
+			AND tb1.use_yn = 'N'
+			AND tb2.product_state = '2'
+			AND tb1.tmp_order_yn = 'Y'
+			AND tb2.del_yn = 'N'
+			<if test="cust_seq != null and cust_seq != ''">
+			AND tb1.cust_seq = #{cust_seq}
+			</if>
+			<if test="session_id != null and session_id != ''">
+			AND tb1.session_id = #{session_id}
+			</if>
+		ORDER BY tb1.cart_seq asc
+	</select>
+
+
+
+	<!--
+    /**
+     * 주문상품 옵션
+     */
+	-->
+	<select id="get_option_list">
+		SELECT tb1.*, tb2.*, tb4.opt_nm1
+		FROM wt_cart_opt tb1
+			INNER JOIN wt_cart tb3 ON tb1.cart_seq = tb3.cart_seq
+			INNER JOIN wt_product_opt2 tb2 ON tb2.opt_cd2 = tb1.opt_cd AND tb2.product_cd = tb3.product_cd
+			INNER JOIN wt_product_opt1 tb4 ON tb2.opt_cd1 = tb4.opt_cd1 AND tb4.product_cd = tb3.product_cd
+		WHERE tb1.cart_seq = #{cart_seq}
+			AND tb2.use_yn ='Y'
+		ORDER BY cart_opt_seq asc
+	</select>
+
+
+	<!--
+	/**
+     * 조합옵션(C)의 추가금액
+     * 재고테이블 조회
+     */
+	-->
+	<select id="get_stock_price_select">
+		SELECT tb2.cart_seq, tb2.qty, tb1.stock_opt_price, opt_val1, opt_val2, (tb2.qty*tb1.stock_opt_price) as tot_stock_opt_price
+		FROM wt_product_stock tb1
+		, ( SELECT a.product_cd, b.qty, a.cart_seq
+						, GROUP_CONCAT(b.opt_cd ORDER BY a.opt_cd ASC) AS opt_group
+				FROM wt_cart a , wt_cart_opt b
+				WHERE a.cart_seq = b.cart_seq
+				AND a.cart_seq = #{cart_seq}
+				AND b.opt_gb = 'C'
+			) tb2
+		WHERE tb1.product_cd = tb2.product_cd
+			AND if(tb1.opt_val1 IS NOT NULL, FIND_IN_SET(tb1.opt_val1, tb2.opt_group) > 0, 1)
+			AND if(tb1.opt_val2 IS NOT NULL, FIND_IN_SET(tb1.opt_val2, tb2.opt_group) > 0, 1)
+			AND if(tb1.opt_val3 IS NOT NULL, FIND_IN_SET(tb1.opt_val3, tb2.opt_group) > 0, 1)
+			AND tb1.opt_gb = 'C'
+	</select>
+
+
+	<!--
+	/**
+     * 이전 주문배송지
+     */
+	-->
+	<select id="get_prev_trnas_list">
+		select distinct cust_nm as re_name, hp as re_hp, home_zip as re_zip, home_addr1 as re_addr1, home_addr2 as re_addr2
+		from wt_member_addr
+		where cust_seq = #{cust_seq}
+		group by cust_nm, hp, home_zip, home_addr1, home_addr2
+		order by mem_addr_seq desc limit 1 
+	</select>
+
+
+	<!--
+	/**
+     * 추가배송비 조회
+     */
+	-->
+	<select id="get_add_trnas_price">
+		select distinct add_price from wt_trans_add_price where zipcode = ${zipcode}
+	</select>
+
+
+	<!--
+    /**
+     * 쿠폰목록
+     */
+	-->
+	<select id="get_coupon_list">
+		select tb2.*, tb1.coupon_member_seq, tb1.s_date as coupon_s_date, tb1.e_date as coupon_e_date
+				,case when tb2.sale_target = '2' then
+					(SELECT GROUP_CONCAT(a.product_nm,'<![CDATA[<br>]]>') AS use_product from wt_product a, wt_coupon_relation b WHERE a.product_cd = b.relation_product_cd AND b.coupon_master_seq = tb2.coupon_master_seq)
+				when tb2.sale_target = '1' then
+					(CONCAT_WS(',', (SELECT IFNULL(category_nm,'') FROM wt_category tb1 WHERE tb2.coupon_category1_cd = tb1.category_cd AND LEVEL = '1') ,
+									(SELECT IFNULL(category_nm,'') FROM wt_category tb1 WHERE tb2.coupon_category2_cd = tb1.category_cd AND LEVEL = '2') ,
+									(SELECT IFNULL(category_nm,'') FROM wt_category tb1 WHERE tb2.coupon_category3_cd = tb1.category_cd AND LEVEL = '3')
+							   )
+					 )
+				end AS use_product_nm
+				, tb3.title AS coupon_title
+		from wt_coupon_member tb1, wt_coupon_master tb2, wt_coupon tb3
+		where tb1.coupon_master_seq = tb2.coupon_master_seq
+		and tb1.coupon_seq = tb3.coupon_seq
+		and tb1.use_yn = 'N'
+		and tb1.cust_seq = #{cust_seq}
+		and tb2.min_price <![CDATA[ <= ]]> ${buy_coupon_price}
+		and tb1.s_date <![CDATA[ <= ]]> now()
+		and adddate(tb1.e_date, 1) >= now()
+		
+		and tb2.coupon_site_gb like '%A%'
+		<if test="order_gb != null and order_gb != '' and order_gb != 'G'">
+		and tb2.gift_yn = 'N'
+		</if>
+
+		order by tb1.coupon_member_seq DESC
+	</select>
+
+
+
+	<!--
+	/**
+     * 택한쿠폰 가능여부확인
+     */
+	-->
+	<select id="get_coupon_apply_list">
+		SELECT tb2.*, tb1.coupon_member_seq, tb1.use_yn, case when tb1.s_date <![CDATA[ <= ]]> now()  and adddate(tb1.e_date, 1) >= now() then 'Y' else 'N' end as date_chk
+		FROM wt_coupon_member tb1, wt_coupon_master tb2
+		WHERE tb1.coupon_master_seq = tb2.coupon_master_seq
+			AND tb1.cust_seq = #{cust_seq}
+			AND tb1.coupon_member_seq = #{coupon_member_seq}
+	</select>
+
+
+
+
+
+	<!--
+	/**
+     * 쿠폰에 사용가능한 상품목록
+     */
+	-->
+	<select id="get_coupon_cart_list">
+		select tb1.cart_seq, tb1.qty, tb2.product_cd , tb2.fee_rate, tb1.opt_cd, ifnull(tb2.coupon_use_yn,'N') AS coupon_use_yn, tb2.supply_price
+			, sp_product_price(tb2.product_cd, tb1.qty, #{member_grp_cd}) as sale_price
+			, tb2.sale_price as sale_price_origin
+		from wt_cart tb1, wt_product tb2
+		where tb1.product_cd = tb2.product_cd
+			and tb1.tmp_order_yn = 'Y'
+			and tb1.use_yn = 'N'
+			AND tb2.del_yn = 'N'
+			AND tb2.coupon_use_yn = 'Y'
+			and tb1.cust_seq = #{cust_seq}
+			<if test="sale_target == '1'">
+				<if test="coupon_category1_cd != null and coupon_category1_cd != '' AND coupon_category2_cd != null and coupon_category2_cd != ''  AND coupon_category3_cd != null and coupon_category3_cd != '' ">
+				and tb1.product_cd in ( SELECT product_cd FROM wt_product_category WHERE category1_cd= #{coupon_category1_cd} AND  category2_cd= #{coupon_category2_cd} AND  category3_cd= #{coupon_category3_cd} )
+				</if>
+				<if test="coupon_category1_cd != null and coupon_category1_cd != '' AND coupon_category2_cd != null and coupon_category2_cd != '' ">
+				and tb1.product_cd in ( SELECT product_cd FROM wt_product_category WHERE category1_cd= #{coupon_category1_cd} AND  category2_cd= #{coupon_category2_cd} )
+				</if>
+				<if test="coupon_category1_cd != null and coupon_category1_cd != '' ">
+				and tb1.product_cd in ( SELECT product_cd FROM wt_product_category WHERE category1_cd= #{coupon_category1_cd}  )
+				</if>
+				
+			</if>
+			<if test="sale_target == '2'">
+				AND tb2.product_cd in ( select relation_product_cd from wt_coupon_relation where coupon_master_seq = #{coupon_master_seq} )";
+			</if>
+	</select>
+
+
+	<!--
+	/**
+     * 주문마스터 작성
+	 wt_order_info
+     */
+	-->
+	<insert id="order_insert">
+		/*return $this->connect->insert_single("wt_order_info", $data, true, false);*/
+		/*
+		paramO.ocode = ocode;
+		paramO.order_yn = order_yn;
+		paramO.otype_cd = otype_cd;
+		paramO.order_state_cd = order_state_cd;
+		paramO.order_price = order_price.replace(",", "");
+		paramO.repay_price = order_price.replace(",", "");
+		paramO.order_origin_price = order_origin_price.replace(",", "");
+		paramO.coupon_price = coupon_sale.replace(",","");
+		paramO.use_reserve = use_reserve.replace(",", "");
+		paramO.use_deposit = use_deposit.replace(",", "");
+		paramO.reserve = give_reserve;
+		paramO.cust_seq = cust_seq;
+		paramO.user_id = user_id;
+		paramO.session_id = null;						//TODO session_id 체크 해야함.
+		paramO.order_gb = order_gb;
+		paramO.or_name = or_name;
+		paramO.or_email = or_email;
+		paramO.or_pass = null;
+		paramO.or_hp = or_hp;
+		paramO.re_name = re_name;
+		paramO.re_hp = re_hp;
+		paramO.re_tel = re_hp02;
+		paramO.re_zip = re_zip;
+		paramO.re_addr1 = re_addr1;
+		paramO.re_addr2 = re_addr2;
+		paramO.coupon_member_seq = coupon_member_seq;
+		paramO.trans_memo = trans_memo;
+		paramO.trans_price = trans_price.replace(",", "");
+		paramO.order_path = "APP";
+		paramO.member_grp_cd = member_grp_cd;
+		*/
+
+		insert into wt_order_info(
+			ocode,
+			order_yn,
+			otype_cd,
+			order_state_cd,
+			order_price,
+			repay_price,
+			order_origin_price,
+			coupon_price,
+			use_reserve,
+			use_deposit,
+			reserve,
+			cust_seq,
+			user_id,
+			<if test="session_id != null">
+				session_id,
+			</if>
+			order_gb,
+			or_name,
+			or_email,
+			or_pass,
+			or_hp,
+			re_name,
+			re_hp,
+			re_tel,
+			re_zip,
+			re_addr1,
+			re_addr2,
+			coupon_member_seq,
+			trans_memo,
+			trans_price,
+			order_path,
+			member_grp_cd
+		) values(
+			#{ocode},
+			#{order_yn},
+			#{otype_cd},
+			#{order_state_cd},
+			#{order_price},
+			#{repay_price},
+			#{order_origin_price},
+			#{coupon_price},
+			#{use_reserve},
+			#{use_deposit},
+			#{reserve},
+			#{cust_seq},
+			#{user_id},
+			<if test="session_id != null">
+				#{session_id},
+			</if>
+			#{order_gb},
+			#{or_name},
+			#{or_email},
+			#{or_pass},
+			#{or_hp},
+			#{re_name},
+			#{re_hp},
+			#{re_tel},
+			#{re_zip},
+			#{re_addr1},
+			#{re_addr2},
+			#{coupon_member_seq},
+			#{trans_memo},
+			#{trans_price},
+			#{order_path},
+			#{member_grp_cd}
+		)
+	</insert>
+
+
+	<!--
+	/**
+     * 주문상품 작성
+	 wt_order_product
+     */
+	-->
+	<insert id="order_product_insert">
+		/*return $this->connect->insert_single("wt_order_product", $data, false, false);*/
+
+		insert into wt_order_product(
+			ocode
+			,product_gb
+			,cart_seq
+			,product_order_state_cd
+			,product_cd
+			,product_nm
+			,supply_price
+			,sale_price
+			,price
+			,qty
+			,product_coupon_dc_price
+			,stock_opt_price
+			,total_price
+			,total_origin_price
+			,fee_price
+			,reserve
+			,total_reserve
+			,iscurr
+			,opt_cd
+			,cancel_qty
+			,reg_date
+			,naver_product_ocode
+
+		) values (
+			#{ocode}
+			,#{product_gb}
+			,#{cart_seq}
+			,#{product_order_state_cd}
+			,#{product_cd}
+			,#{product_nm}
+			,#{supply_price}
+			,#{sale_price}
+			,#{price}
+			,#{qty}
+			,#{product_coupon_dc_price}
+			,#{stock_opt_price}
+			,#{total_price}
+			,#{total_origin_price}
+			,#{fee_price}
+			,#{reserve}
+			,#{total_reserve}
+			,#{iscurr}
+			,#{opt_cd}
+			,#{cancel_qty}
+			,now()
+			,#{naver_product_ocode}
+
+		)
+	</insert>
+
+	<!--
+	/**
+     * 주문상품옵션 작성
+     */
+	-->
+	<insert id="order_product_opt_insert">
+		INSERT INTO wt_order_product_opt ( product_ocode, opt_gb, ocode, opt_cd, opt_nm, opt_supply_price, opt_sale_price, opt_reserve, opt_qty, w_opt )
+			SELECT tb2.product_ocode, tb1.opt_gb, '$ocode', tb1.opt_cd, tb3.opt_nm2
+				, tb3.opt_price, tb3.opt_price, ( tb3.opt_price* ${reserve_rate} /100)
+				, tb1.qty
+				, tb1.w_opt
+			FROM wt_cart_opt tb1 , wt_order_product tb2, wt_product_opt2 tb3
+			WHERE tb1.cart_seq = tb2.cart_seq
+				AND tb1.opt_cd = tb3.opt_cd2
+				AND tb2.product_cd = tb3.product_cd
+				AND tb3.del_yn='N'
+				AND tb2.ocode =#{ocode}
+	</insert>
+
+	<!--
+	/**
+     * 주문 수령방법 저장
+     */
+	-->
+	<insert id="order_receive_insert">
+		INSERT INTO wt_order_receive (ocode, product_ocode ,receive_gb ,receive_date ,receive_time ,store_seq, serial_num ,receive_hp ,reg_date)
+			SELECT tb2.ocode, tb2.product_ocode ,tb1.receive_gb ,tb1.receive_date ,tb1.receive_time ,tb1.store_seq,LEFT(UPPER(REPLACE(MD5(UUID()),'-','')),15) ,tb1.receive_hp , NOW()
+			FROM wt_cart_receive tb1, wt_order_product tb2
+			WHERE tb1.cart_seq = tb2.cart_seq
+				AND tb2.ocode = #{ocode}
+	</insert>
+
+	<!--
+	/**
+     * 메세지 보낼 쿠폰 수령자 목록
+     */
+	-->
+	<select id="get_send_receive_list">
+		select tb2.receive_hp, tb2.serial_num, tb2.ocode
+		from wt_order_info tb1, wt_order_receive tb2
+		where tb1.ocode = tb2.ocode
+			and tb1.order_yn = 'Y'
+			and tb1.order_state_cd in (20,30,35)
+			and tb1.order_gb = #{order_gb}
+			and tb1.ocode = #{ocode}
+			and tb2.receive_yn = 'N'
+		group by product_ocode
+	</select>
+
+
+	<!--
+	/**
+     * 선물하기 수령방식에 따른 발송자 승인발송 리스트
+     */
+	-->
+	<select id="get_gift_confirm_list">
+		select tb1.ocode, tb3.re_hp, tb3.ran_cd
+		from wt_order_info tb1, wt_order_gift_info tb3
+		where tb1.ocode = tb3.ocode
+			and tb1.order_yn = 'Y'
+			and tb1.order_state_cd in (20,30,35)
+			AND tb1.order_gb = 'G'
+			and tb1.ocode = #{ocode}
+			and tb3.done_yn = 'N'
+			and tb3.cancel_yn = 'N'
+	</select>
+
+	<!--
+	/**
+     * 선물하기 수령확인 정보
+     */
+	-->
+	<select id="get_confirm_gift_info">
+		select tb2.*, tb1.order_gb, tb1.order_price, tb1.otype_cd, tb1.or_name, tb1.order_state_cd
+				, (select tid from wt_card where wt_card.ocode = tb1.ocode ) as tid
+				, (select pay_method from wt_card where wt_card.ocode = tb1.ocode ) as pay_method
+				, (select vact_num from wt_card where wt_card.ocode = tb1.ocode ) as vact_num
+				, (select vact_cd from wt_card where wt_card.ocode = tb1.ocode ) as vact_cd
+				, (select vact_user_nm from wt_card where wt_card.ocode = tb1.ocode ) as vact_user_nm
+				, (SELECT count(*) FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' ) p_cnt
+				, (SELECT product_nm FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' order by product_ocode asc limit 1 ) product_nm
+
+		from wt_order_info tb1 , wt_order_gift_info tb2
+		where tb1.ocode = tb2.ocode
+			and tb1.order_yn='Y'
+			/* and tb1.order_state_cd in (20,30,35) */
+			and tb1.order_gb = 'G'
+			and tb1.ocode= #{ocode}
+			and tb2.ran_cd= #{ran_cd}
+			and tb2.done_yn = 'N'
+			/* and tb2.cancel_yn = 'N' */
+			/* 취소 상태면 페이지 접근 금지가 아닌 사용자페이지에서 노출 후, 알럿을 띄워주기 위한 수정 요청 */
+			
+			<if test="mode != null and mode != '' ">
+			and tb1.order_state_cd in (20,30,35) and tb2.cancel_yn = 'N'
+			</if>
+	</select>
+
+
+	<!--
+	/**
+     * 선물하기 수령상태 변경
+     */
+	-->
+	<update id="set_confirm_gift_info">
+	/*return $this->db->update('wt_order_gift_info', $array, array('ocode' => $ocode));*/
+	</update>
+
+
+	<!--
+	/**
+     * 사용가능한 시리얼 번호인지 체크
+     */
+	-->
+	<select id="get_serial_num_check">
+		select tb2.*
+				, tb3.product_nm
+				, sp_get_code_nm(tb2.receive_time) as receive_time_str
+				, sp_get_code_nm(tb2.receive_gb) as receive_gb_str
+				, (select concat('[',b.code_nm2,'] ', a.company_nm)
+					from wt_admin a left join wt_code2 b on b.code_cd2 = a.branch_cd
+					where a.admin_gb = 'com' and a.del_yn = 'N' and a.use_yn = 'Y' and a.no = tb2.store_seq) as store_nm
+		from wt_order_info tb1 , wt_order_receive tb2, wt_order_product tb3
+		where tb1.ocode = tb2.ocode
+		and tb2.product_ocode = tb3.product_ocode
+		and tb1.order_yn='Y'
+		and tb1.order_state_cd in (20,30,35)
+		and tb1.ocode= #{ocode}
+		and tb2.serial_num = #{serial_num}
+	</select>
+
+
+
+	<!--
+	/**
+     * 결제 - 선물하기 전화전호 조회
+     */
+	-->
+	<select id="order_receive_user">
+		SELECT distinct receive_hp
+		FROM wt_order_receive tb1
+		WHERE tb1.ocode= #{ocode}
+	</select>
+
+	<!--
+	/**
+     * 선물하기정보 등록
+     */
+	-->
+	<insert id="order_gift_insert">
+		/*return $this->connect->insert_single("wt_order_gift_info", $data, false, false);*/
+		/*
+		paramOGI.ocode					= ocode;
+		paramOGI.re_name				= receive_nm;
+		paramOGI.re_hp					= receive_hp;
+		paramOGI.gift_gb				= gift_order_gb;
+		paramOGI.gift_msg				= receive_msg;
+		paramOGI.ran_cd					= fc.random6String();
+		paramOGI.done_yn				= "N";
+		paramOGI.reg_date				= fc.getDate();
+		*/
+
+		insert into wt_order_gift_info(
+			ocode,
+			re_name,
+			re_hp,
+			gift_gb,
+			gift_msg,
+			ran_cd,
+			done_yn,
+			reg_date
+		) values (
+			#{ocode},
+			#{re_name},
+			#{re_hp},
+			#{gift_gb},
+			#{gift_msg},
+			#{ran_cd},
+			#{done_yn},
+			#{reg_date}
+		)
+
+	</insert>
+
+
+	<!--
+	/**
+     * 쿠폰 사용처리
+     */
+	-->
+	<update id="order_coupon_update">
+		update wt_coupon_member
+			set ocode = #{ocode},
+				use_yn = 'Y',
+				use_date = now()
+			where
+				coupon_member_seq = #{coupon_member_seq}
+	</update>
+
+
+	<!--
+	/**
+     * 상품별 증정품 지급
+     */
+	-->
+	<insert id="order_product_present">
+		INSERT INTO wt_order_product (ocode  ,product_order_state_cd ,product_cd ,product_nm ,qty ,iscurr ,product_gb ,reg_date)
+			SELECT #{ocode}, '10', tb3.product_cd, tb3.product_nm, tb1.qty, tb1.iscurr, 'P', now()
+			FROM wt_order_product tb1, wt_product_present tb2, wt_product tb3
+			WHERE tb1.product_cd = tb2.product_cd
+				AND tb2.present_product_cd = tb3.product_cd
+				AND tb1.ocode = #{ocode}
+	</insert>
+
+	<!--
+	/**
+     * 결제 - pg 통신할 주문정보
+     */
+	-->
+	<select id="get_order_account">
+		SELECT tb1.*
+				, (SELECT count(*) FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' ) p_cnt
+				, (SELECT sum(qty) FROM  wt_order_product WHERE ocode = tb1.ocode ) sum_p_cnt
+				, (SELECT product_nm FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' order by product_ocode asc limit 1 ) product_nm
+				, (SELECT product_cd FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' order by product_ocode asc limit 1 ) product_cd
+				, tb2.aid, tb4.gift_gb
+		FROM wt_order_info tb1
+		LEFT OUTER JOIN wt_card tb2
+		ON tb1.ocode = tb2.ocode
+		left outer join wt_order_gift_info tb4
+		on tb1.ocode = tb4.ocode
+		WHERE tb1.ocode= #{ocode}
+		AND tb1.order_yn='N'
+	</select>
+
+
+	<!--
+	/**
+     * 결제 - pg 통신할 상품목록
+     */
+	-->
+	<select id="get_order_product_account">
+		SELECT * from wt_order_product where ocode = #{ocode}
+	</select>
+
+
+	<!--
+	/**
+     * 결제 - 카드 정보 업데이트
+     */
+	-->
+	<update id="order_card_update">
+		/*return $this->connect->update_single("wt_card", $array, ['ocode' => $ocode], FALSE);*/
+	</update>
+
+
+	<!--
+	/**
+     * 완료 - 결제 마스터 정보 조회
+     */
+	-->
+	<select id="get_finish_order_info">
+		select tb1.*, tb2.vact_num, tb2.vact_nm, tb2.tid, tb3.otype_nm
+					, (select count(*) from  wt_order_product where ocode = tb1.ocode and product_gb='N' ) p_cnt
+					, (select product_nm from  wt_order_product where ocode = tb1.ocode and product_gb='N' order by product_ocode asc limit 1 ) product_nm
+					, tb4.gift_gb, tb4.done_yn, tb4.ran_cd
+			from wt_order_info tb1 left outer join wt_card tb2
+			on tb1.ocode = tb2.ocode
+			left outer join wt_order_otype tb3
+			on tb1.otype_cd = tb3.otype_cd
+			left outer join wt_order_gift_info tb4
+			on tb1.ocode = tb4.ocode
+			where tb1.ocode = #{ocode}
+			and tb1.order_yn = 'Y'
+	</select>
+
+
+	<!--
+	/**
+     * 주문완료 - 결제 마스터 정보 조회
+     */
+	-->
+	<select id="get_order_info">
+		select tb1.*, tb2.vact_num, tb2.vact_nm, tb2.tid, tb2.vact_secret_cd
+				, (select sum(qty) from wt_order_product where ocode = tb2.ocode ) tot_qty
+				, (select count(*) from wt_order_info tb0 where tb1.cust_seq = tb0.cust_seq and order_state_cd in (20,30,35,40) and tb0.cust_seq is not null) first_order_cnt
+				, (select count(*) from  wt_order_product where ocode = tb1.ocode and product_gb='N' ) p_cnt
+				, (select product_nm from wt_order_product where ocode = tb1.ocode and product_gb='N' order by product_ocode asc limit 1 ) product_nm
+				, (select title from wt_coupon_member a, wt_coupon_master b where a.coupon_master_seq = b.coupon_master_seq and a.coupon_member_seq = tb1.coupon_member_seq ) coupon_nm
+				, tb3.re_name AS gift_re_name
+				, tb3.gift_gb
+				, tb3.gift_msg
+				, tb3.ran_cd
+				, tb3.re_hp AS gift_re_hp
+				, tb3.done_yn
+		from 
+			wt_order_info tb1 
+			left outer join wt_card tb2 on tb1.ocode = tb2.ocode
+			LEFT OUTER JOIN wt_order_gift_info tb3 ON tb3.ocode = tb1.ocode
+		where tb1.ocode = #{ocode}
+			and tb1.order_yn = 'Y'
+			<if test="order_state_cd != null and order_state_cd != ''">
+			AND tb1.order_state_cd = #{order_state_cd}
+			</if>
+	</select>
+
+
+	<!--
+	/**
+     * 완료 - 결제 상품 정보 조회
+     */
+	-->
+	<select id="get_order_product">
+		SELECT tb1.*, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS main_img
+		FROM wt_order_product tb1, wt_product tb2
+		WHERE tb1.product_cd = tb2.product_cd
+		AND tb1.ocode = #{ocode}
+		ORDER BY tb1.cart_seq asc
+	</select>
+
+
+	<!--
+	/**
+     * 완료 - 주문상품 옵션 목록
+     */
+	-->
+	<select id="get_order_product_option">
+		SELECT tb2.*
+				,(SELECT opt1.opt_nm1 FROM wt_product_opt1 opt1, wt_product_opt2 opt2
+				   WHERE opt1.opt_cd1 = opt2.opt_cd1
+					 AND opt2.opt_cd2 = tb2.opt_cd
+					 AND opt2.product_cd = tb1.product_cd
+					 AND opt1.product_cd = opt2.product_cd) as opt_nm1
+				, ( SELECT w_opt FROM wt_cart_opt WHERE cart_seq = tb1.cart_seq LIMIT 1 ) w_opt
+		FROM wt_order_product tb1, wt_order_product_opt tb2
+		WHERE tb1.product_ocode = tb2.product_ocode
+			AND tb1.ocode = #{ocode}
+			AND tb2.product_ocode = #{product_ocode}
+		/* ORDER BY tb2.order_product_opt_seq asc */
+		ORDER BY tb2.opt_cd asc
+	</select>
+
+
+	<!--
+	/**
+     * 결제정보 등록
+     */
+	-->
+	<insert id="order_card_insert">
+		/*return $this->connect->insert_single("wt_card", $data, false, false);*/
+		/* TODO wt_card 에 등록 하는 방식이 틀려져서.. 여러 방식으로 insert 되어야 할것 같음*/
+		/*
+		paramOCI.ocode			= ocode;
+		paramOCI.vact_num		= "";		//TODO bank_num 찾아와야 함
+		paramOCI.vact_nm		= "";		//TODO bank_nm 찾아와야 함
+		paramOCI.vact_user_nm	= or_name;
+		*/
+		insert into wt_card(
+			ocode,
+			vact_num,
+			vact_nm,
+			vact_user_nm
+		) values(
+			#{ocode},
+			#{vact_num},
+			#{vact_nm},
+			#{vact_user_nm}
+		)
+	</insert>
+
+	<!--
+	/**
+     * 결제상태 업데이트
+     */
+	-->
+	<update id="order_update">
+		/*
+		$rtn = $this->connect->update_single("wt_order_info", $data, ['ocode' => $ocode], FALSE);
+		return $rtn;
+		*/
+	</update>
+
+
+	<!--
+	/**
+     * 회원 배송지 정보 업데이트
+     */
+	-->
+	<delete id="update_member_info">
+		delete from wt_member_addr where cust_seq = #{cust_seq} and default_yn = 'Y' and addr_gb >= 0
+	</delete>
+	
+	<update id="update_member_info2">
+		/* $this->connect->update_single("wt_member_addr", $data, ['cust_seq' => $this->session->userdata('cust_seq')], FALSE);*/
+		/*
+		$mem_arrays = [
+						'cust_seq'     => $this->session->userdata('cust_seq'),
+						'cust_nm'      => $data['re_name'],
+						'home_zip'     => $data['re_zip'],
+						'home_addr1'   => $data['re_addr1'],
+						'home_addr2'   => $data['re_addr2'],
+						'tel'          => $data['re_hp'],
+						'hp'           => $data['re_hp'],
+						'delivery_msg' => $data['trans_memo'],
+						'default_yn'   => 'Y'
+		];
+		*/
+		update wt_member_addr
+		set
+			cust_nm = #{cust_nm},
+			home_zip = #{home_zip},
+			home_addr1 = #{home_addr1},
+			home_addr2 = #{home_addr2},
+			tel = #{tel},
+			hp = #{hp},
+			delivery_msg = #{delivery_msg},
+			default_yn = #{default_yn}
+		where
+			cust_seq = #{cust_seq}
+	</update>
+
+
+	<!--
+	## 회원 최근 배송지 insert
+	-->
+	<insert id="insert_mem_addr">
+		/*$this->db->insert('wt_member_addr',$data);*/
+		/*
+		paramAA.cust_seq = cust_seq;
+		paramAA.cust_nm = re_name;
+		paramAA.home_zip = re_zip;
+		paramAA.home_addr1 = re_addr1;
+		paramAA.home_addr2 = re_addr2;
+		paramAA.tel = re_hp;
+		paramAA.hp = re_hp;
+		paramAA.delivery_msg = trans_memo;
+		paramAA.default_yn = "N";
+		paramAA.addr_gb = "O";
+		*/
+		insert into wt_member_addr(
+			cust_seq,
+			cust_nm,
+			home_zip,
+			home_addr1,
+			home_addr2,
+			tel,
+			hp,
+			delivery_msg,
+			default_yn,
+			addr_gb
+		) values (
+			#{cust_seq},
+			#{cust_nm},
+			#{home_zip},
+			#{home_addr1},
+			#{home_addr2},
+			#{tel},
+			#{hp},
+			#{delivery_msg},
+			#{default_yn},
+			#{addr_gb}
+		)
+	</insert>
+
+	<!--
+	/**
+     * 결제상태 업데이트
+     */
+	-->
+	<update id="order_product_update">
+		update wt_order_product
+		set
+			product_order_state_cd = #{product_order_state_cd}
+		where
+			ocode = #{ocode}
+	</update>
+
+	<!--
+	/**
+     * 주문 더그리드 송장번호 수신
+     */
+	-->
+	<update id="from_order_update">
+		/*
+		$rtn = $this->connect->update_single("wt_order_info", $data, ['ocode' => $ocode], FALSE);
+		return $rtn;
+		*/
+	</update>
+
+
+	<!--
+	/**
+     * 주문 히스토리 등록
+     */
+	-->
+	<insert id="order_history">
+		insert into wt_order_history(ocode, order_state_cd, reg_date)
+		values(#{ocode}, #{order_state_cd}, now())
+	</insert>
+
+
+	<!--
+	/**
+     * 카트 사용완료 처리
+     */
+	-->
+	<update id="cart_finish_update">
+		update wt_cart tb1, wt_order_product tb2
+		set tb1.use_yn='Y', tb1.tmp_order_yn = 'N'
+		where tb1.cart_seq = tb2.cart_seq
+			and tb2.ocode = #{ocode}
+			and tb2.product_gb = 'N'
+	</update>
+
+
+	<!--
+	/**
+     * 상품 재고차감
+     */
+	 #조합일경우 재고차감
+	-->
+	<update id="order_stock_update">
+		UPDATE wt_product_stock tb1
+				, ( SELECT tb1.product_cd, tb2.opt_qty, tb2.opt_gb, tb1.product_ocode
+							, GROUP_CONCAT(tb2.opt_cd ORDER BY tb2.opt_cd ASC) AS opt_group
+					FROM wt_order_product tb1 , wt_order_product_opt tb2
+					WHERE tb1.product_ocode = tb2.product_ocode
+						AND tb1.ocode= #{ocode}
+						AND tb1.product_gb = 'N'
+						AND tb2.opt_gb = 'C'
+					GROUP BY product_ocode
+				) tb2
+		SET tb1.stock = tb1.stock - tb2.opt_qty
+		WHERE tb1.product_cd = tb2.product_cd
+			AND if(tb1.opt_val1 IS NOT NULL, FIND_IN_SET(tb1.opt_val1, tb2.opt_group) > 0, 1)
+			AND if(tb1.opt_val2 IS NOT NULL, FIND_IN_SET(tb1.opt_val2, tb2.opt_group) > 0, 1)
+			AND if(tb1.opt_val3 IS NOT NULL, FIND_IN_SET(tb1.opt_val3, tb2.opt_group) > 0, 1)
+			AND tb1.opt_gb = 'C'
+			AND tb1.stock > 0
+	</update>
+
+	<!--
+	 #개별옵션&추가옵션 재고차감
+	-->
+	<update id="order_stock_updateSub1">
+		UPDATE wt_product_stock tb1
+						, (	SELECT tb1.product_cd, tb2.opt_cd, tb2.opt_qty
+							FROM wt_order_product tb1, wt_order_product_opt tb2
+							WHERE tb1.product_ocode = tb2.product_ocode
+							AND tb1.ocode= #{ocode}
+							AND tb1.product_gb = 'N'
+							AND tb2.opt_gb IN ('I','S')
+						) tb2
+		SET tb1.stock = tb1.stock - tb2.opt_qty
+		WHERE tb1.product_cd = tb2.product_cd
+		AND tb1.opt_cd2 = tb2.opt_cd
+		AND tb1.opt_gb IN ('I','S')
+		AND tb1.stock > 0
+	</update>
+	
+	<!--
+	 #옵션없는 일반상품
+	-->
+	<update id="order_stock_updateSub2">
+		UPDATE wt_product_stock tb1 , wt_order_product tb2
+		SET tb1.stock = tb1.stock - tb2.qty
+		WHERE tb1.product_cd = tb2.product_cd
+			and tb1.opt_cd2 is null
+			and tb1.opt_gb = 'I'
+			AND tb2.ocode= #{ocode}
+			AND tb2.product_gb = 'N'
+			AND tb1.stock > 0
+	</update>
+
+
+	<!--
+	/**
+     * pg 입금통보 로그
+     */
+	-->
+	<insert id="pg_log">
+		/*
+		if($data){
+        	$log_data['log'] = json_encode($data,JSON_UNESCAPED_UNICODE);
+        }
+
+        $log_data['reg_date'] = date("Y-m-d H:i:s");
+
+		return $this->db->insert("wt_order_pg_log", $log_data);
+		*/
+	</insert>
+
+	<!--
+	 /**
+     * 결제 실패 로그
+     */
+	-->
+	<insert id="order_fail_log">
+		insert into wt_order_fail_log(ocode, fail_msg, reg_date)
+		values(#{ocode}, #{fail_msg}, now())
+	</insert>
+
+	<select id="get_mem_info">
+		SELECT tb1.*
+			, tb2.mem_addr_seq
+			,(SELECT member_grp_nm FROM wt_member_grp WHERE member_grp_cd = tb1.member_grp_cd ) AS member_grp_nm
+			, SUBSTRING(tb1.phone,1,3) AS phone1
+			, SUBSTRING(tb1.phone,4,4) AS phone2
+			, SUBSTRING(tb1.phone,8,4) AS phone3
+			, SUBSTRING_INDEX(tb1.email,'@',1) AS email_id
+			, SUBSTRING_INDEX(tb1.email,'@',-1) AS email_addr
+		FROM wt_member tb1
+			LEFT JOIN wt_member_addr tb2 ON tb2.cust_seq = tb1.cust_seq AND tb2.default_yn = 'Y'
+		WHERE tb1.cust_seq= #{cust_seq}
+		limit 1
+	</select>
+
+
+	<!--
+	/**
+	* 현금영수증 내역 등록
+	**/
+	-->
+	<insert id="get_cash_receipts_insert">
+		/* return $this->connect->insert_single("wt_order_cash_receipts", $array, false, false); */
+	</insert>
+
+	<select id="get_order_product_coupon">
+		SELECT tb2.total_price, tb2.product_ocode, tb2.product_cd, tb3.coupon_use_yn
+		FROM wt_order_product tb2, wt_product tb3
+		where tb2.product_cd = tb3.product_cd 
+			and tb2.ocode = #{ocode}
+			and tb2.product_gb = 'N'
+	</select>
+
+	<update id="order_product_coupon_update">
+		update wt_order_product
+		set product_coupon_dc_price = #{product_coupon_dc_price}
+		where product_ocode = #{product_ocode}
+	</update>
+
+
+	<select id="get_coupon_apply_list_dev">
+		SELECT tb2.*, tb1.coupon_member_seq, tb1.use_yn, case when tb1.s_date <![CDATA[ <= ]]> now()  and adddate(tb1.e_date, 1) >= now() then 'Y' else 'N' end as date_chk
+		FROM wt_coupon_member tb1, wt_coupon_master tb2
+		WHERE tb1.coupon_master_seq = tb2.coupon_master_seq
+			AND tb1.coupon_member_seq = #{coupon_member_seq }
+	</select>
+
+	<select id="get_coupon_cart_list_dev">
+		select tb1.cart_seq, tb1.qty, tb2.product_cd , tb2.fee_rate, tb1.opt_cd, ifnull(tb2.coupon_use_yn,'N') AS coupon_use_yn, tb2.supply_price
+			, tb2.sale_price as sale_price_origin
+			, tb1.total_price as total_price_grigin
+		from wt_order_product tb1, wt_product tb2
+		where tb1.product_cd = tb2.product_cd
+			and tb1.ocode = #{ocode}
+			AND tb2.del_yn = 'N'
+			and tb2.coupon_use_yn = 'Y'
+			<if test="sale_target == '1'">
+				<if test="coupon_category1_cd != null and coupon_category1_cd != '' AND coupon_category2_cd != null and coupon_category2_cd != ''  AND coupon_category3_cd != null and coupon_category3_cd != '' ">
+				and tb1.product_cd in ( SELECT product_cd FROM wt_product_category WHERE category1_cd= #{coupon_category1_cd} AND  category2_cd= #{coupon_category2_cd} AND  category3_cd= #{coupon_category3_cd} )
+				</if>
+				<if test="coupon_category1_cd != null and coupon_category1_cd != '' AND coupon_category2_cd != null and coupon_category2_cd != '' ">
+				and tb1.product_cd in ( SELECT product_cd FROM wt_product_category WHERE category1_cd= #{coupon_category1_cd} AND  category2_cd= #{coupon_category2_cd} )
+				</if>
+				<if test="coupon_category1_cd != null and coupon_category1_cd != '' ">
+				and tb1.product_cd in ( SELECT product_cd FROM wt_product_category WHERE category1_cd= #{coupon_category1_cd}  )
+				</if>
+				
+			</if>
+			<if test="sale_target == '2'">
+				AND tb2.product_cd in ( select relation_product_cd from wt_coupon_relation where coupon_master_seq = #{coupon_master_seq} )";
+			</if>
+	</select>
+
+	<select id="kmh_coupon_order">
+		SELECT tb1.ocode, tb1.coupon_member_seq, tb1.coupon_price
+		FROM wt_order_info tb1,
+			(SELECT ocode, SUM(product_coupon_dc_price) as sum_coupon_price FROM wt_order_product
+			GROUP BY ocode) tb2
+		WHERE tb1.ocode = tb2.ocode
+			and tb1.coupon_price !=sum_coupon_price
+	</select>
+
+	<select id="kmh_cart_list">
+		SELECT tb2.*, tb3.coupon_use_yn
+		FROM wt_order_product tb2, wt_product tb3
+		where tb2.product_cd = tb3.product_cd and tb2.ocode = #{ocode} and tb2.product_gb = 'N'
+	</select>
+
+	<update id="kmh_order_product_update">
+		update wt_order_product
+		set product_coupon_dc_price = #{product_coupon_dc_price}
+		where product_ocode = #{product_ocode}
+	</update>
+
+
+
+
+
+
+
+</mapper>

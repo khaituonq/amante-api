@@ -1,0 +1,920 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="concept-room">
+
+    <select id="get_concept_room_view">
+        SELECT
+            A.concept_room_seq,
+            A.concept_room_nm,
+            B.code_nm2 AS brand,
+            (SELECT COUNT(*) FROM wt_like_info WHERE ref_seq = A.concept_room_seq AND sort = 'concept_room') as like_cnt,
+        CASE
+            WHEN A.state = 'I' THEN
+            '진행'
+            WHEN A.state = 'W' THEN
+            '대기' ELSE '마감'
+            END AS state,
+            A.thumbnail_img,
+            A.bg_url,
+            A.vw_cnt,
+            A.dl_cnt,
+            A.upload_method,
+            C.admin_nm AS user_nm,
+            ifnull(( SELECT 'on' FROM wt_like_info WHERE sort = 'concept_room' AND ref_seq = ${concept_room_seq} AND cust_seq = #{cust_seq} LIMIT 1 ), '' ) AS like_on
+        FROM
+            vn_concept_room A
+            JOIN wt_code2 B ON A.brand = B.code_cd2
+            JOIN wt_admin C ON A.admin_id = C.admin_id
+        WHERE
+            A.use_yn = 'Y'
+            AND A.del_yn = 'N'
+            AND A.concept_room_seq = ${concept_room_seq};
+
+        SELECT
+            D.h_code,
+            D.h_name,
+            GROUP_CONCAT(C.d_name SEPARATOR ',') as style,
+            D.file_nm_enb,
+            D.file_nm_dis
+        FROM
+            vn_concept_room A
+            JOIN vn_room_content_div B ON A.concept_room_seq = B.room_seq
+            JOIN vn_room_div_d C ON C.d_code = B.d_code AND C.h_code = B.h_code
+            JOIN vn_room_div_h D ON D.h_code = B.h_code AND D.h_code = C.h_code
+        WHERE
+            A.use_yn = 'Y'
+            AND A.del_yn = 'N'
+            AND C.use_yn = 'Y'
+            AND C.del_yn = 'N'
+            AND D.use_yn = 'Y'
+            AND D.del_yn = 'N'
+            AND A.concept_room_seq = ${concept_room_seq}
+        GROUP BY D.h_name
+        ORDER BY B.h_code ASC;
+
+        SELECT
+            A.*
+        FROM
+            vn_concept_room_view A
+            JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq
+        WHERE
+            A.concept_room_seq = ${concept_room_seq}
+            AND A.method = B.upload_method
+            AND B.del_yn = 'N'
+            AND B.use_yn = 'Y';
+
+
+        SELECT
+            A.*
+        FROM
+            vn_concept_room_object A
+            JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq
+        WHERE
+            B.concept_room_seq = ${concept_room_seq}
+            AND B.upload_method = A.method
+            AND B.del_yn = 'N'
+            AND B.use_yn = 'Y';
+
+        SELECT
+            A.option_seq,
+            A.object_seq,
+            A.id,
+            A.product_cd,
+            A.option_nm,
+            A.thumbnail_img,
+            A.option_file_nm
+        FROM
+            vn_concept_room_opt A
+            LEFT JOIN vn_concept_room_object B ON A.object_seq = B.object_seq
+            LEFT JOIN vn_concept_room C ON C.concept_room_seq = B.concept_room_seq
+        WHERE
+            C.concept_room_seq = ${concept_room_seq}
+            AND C.use_yn = 'Y'
+            AND C.del_yn = 'N'
+            AND C.upload_method = B.method
+        GROUP BY A.option_seq;
+
+        SELECT
+            A.concept_room_seq,
+			A.concept_room_nm,
+            (SELECT COUNT(*) FROM wt_like_info WHERE ref_seq = A.concept_room_seq AND sort = 'concept_room') as like_cnt,
+            A.dl_cnt,
+            A.vw_cnt,
+            A.thumbnail_img,
+            CONCAT('#', GROUP_CONCAT(C.d_name SEPARATOR '#')) as style
+        FROM
+            vn_concept_room A
+            INNER JOIN vn_room_content_div B ON A.concept_room_seq = B.room_seq
+            INNER JOIN vn_room_div_d C ON C.d_code = B.d_code AND C.h_code = B.h_code
+            INNER JOIN vn_room_div_h D ON D.h_code = B.h_code AND D.h_code = C.h_code
+        WHERE
+            1 = 1
+            AND A.use_yn = 'Y'
+            AND A.del_yn = 'N'
+            AND C.d_code IN (SELECT d_code FROM vn_room_content_div WHERE room_seq = ${concept_room_seq})
+            AND D.h_code IN (SELECT h_code FROM vn_room_content_div WHERE room_seq = ${concept_room_seq})
+            AND <![CDATA[ A.concept_room_seq <> ${concept_room_seq} ]]>
+        GROUP BY
+        A.concept_room_seq,
+        A.concept_room_nm,
+        A.dl_cnt,
+        A.vw_cnt,
+        A.thumbnail_img
+        ORDER BY
+        (SELECT SUM(CASE WHEN EXISTS(SELECT * FROM vn_room_content_div WHERE room_seq = ${concept_room_seq} AND d_code = B.d_code AND h_code = B.h_code) THEN 1 ELSE 0 END) as cnt) DESC,
+        reg_date DESC;
+
+        SELECT DISTINCT
+            A.product_cd,
+            A.product_nm,
+            A.supply_price,
+            A.sale_price,
+            A.discount_gb,
+            A.icon,
+            A.product_type,
+            A.product_state,
+            B.file_nm,
+
+          
+            <if test="cust_seq != null">
+				CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = A.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on,
+			</if>
+			
+			<if test="cust_seq == null">
+			    'N' wish_click_on,
+			</if>
+            (SELECT COUNT(*) FROM wt_use_review WHERE use_yn = 'Y' AND product_cd = A.product_cd) AS review_cnt,
+            ifnull(( SELECT round( avg( POINT ), 1 ) FROM wt_use_review_point WHERE product_cd = A.product_cd ), 0 ) AS review_avg_point,
+            A.fee_rate,
+            A.keywd
+        FROM
+            wt_product A
+            LEFT JOIN wt_product_file B ON A.product_cd = B.product_cd
+        WHERE
+            FIND_IN_SET(A.product_cd, (
+                SELECT GROUP_CONCAT(A.product_cd SEPARATOR ',') as product_cd
+                FROM
+                vn_concept_room_opt A
+                JOIN vn_concept_room_object B ON A.object_seq = B.object_seq
+                JOIN vn_concept_room C ON C.concept_room_seq = B.concept_room_seq AND C.upload_method = B.method
+                WHERE C.concept_room_seq = ${concept_room_seq}
+            ))
+            AND del_yn = 'N'
+        GROUP BY A.product_cd;
+
+        SELECT
+            A.*
+        FROM
+            vn_room_outside_prd A
+            JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq
+        WHERE
+            A.concept_room_seq = ${concept_room_seq}
+            AND B.use_yn = 'Y'
+            AND B.del_yn = 'N'
+            AND B.upload_method = A.method;
+
+    </select>
+
+    <select id="get_related_product">
+        SELECT 
+            A.product_cd,
+            A.product_nm,
+            A.supply_price,
+            A.sale_price,
+            A.discount_gb,
+            A.icon,
+            A.product_type,
+            A.product_state,
+            B.file_nm,
+            <if test="cust_seq != '' && cust_seq != null">
+                ifnull(( SELECT 'on' FROM wt_wishlist WHERE product_cd = A.product_cd AND cust_seq = #{cust_seq} LIMIT 1 ), '' ) AS  wish_click_on, 
+            </if>
+            (SELECT COUNT(*) FROM wt_use_review WHERE use_yn = 'Y' AND product_cd = A.product_cd) AS review_cnt,
+            ifnull(( SELECT round( avg( POINT ), 1 ) FROM wt_use_review_point WHERE product_cd = A.product_cd), 0 ) AS review_avg_point,
+            A.fee_rate,
+            A.keywd, 
+            B.file_nm
+        FROM 
+            wt_product A LEFT JOIN wt_product_file B ON A.product_cd = B.product_cd 
+        WHERE 
+            1 = 1
+            AND del_yn ='N'
+            <if test="keyword != null && keyword != ''">
+                AND
+                <foreach collection="keyword" item="keywd" open="(" close=")" separator="OR">
+                        <bind name="keywd" value="'%' + keywd + '%'" />
+                        A.keywd LIKE #{keywd}
+                </foreach>
+            </if>
+        GROUP BY
+            A.product_cd
+        LIMIT 10;
+    </select>
+
+    <select id="get_product_info">
+        SELECT
+			A.product_cd,
+			A.product_nm,
+			A.supply_price,
+			A.sale_price,
+			A.discount_gb,
+			A.icon,
+			A.product_type,
+			A.product_state,
+			B.file_nm,
+			ifnull(( SELECT 'on' FROM wt_wishlist WHERE product_cd = A.product_cd AND cust_seq = #{cust_seq} LIMIT 1 ), '' ) AS  wish_click_on, 
+			(SELECT COUNT(*) FROM wt_use_review WHERE use_yn = 'Y' AND product_cd = A.product_cd) AS review_cnt,
+			ifnull(( SELECT round( avg( POINT ), 1 ) FROM wt_use_review_point WHERE product_cd = A.product_cd ), 0 ) AS review_avg_point,
+			A.fee_rate,
+			A.keywd
+		FROM
+			wt_product A 
+			LEFT JOIN wt_product_file B ON A.product_cd = B.product_cd
+		WHERE
+			A.product_cd = #{product_cd}
+			AND del_yn = 'N'
+		LIMIT 1;
+    </select>
+
+    <select id="get_concept_room_list">
+        SELECT
+            E.concept_room_seq,
+            E.concept_room_nm,
+            G.code_nm2 AS brand,
+            E.thumbnail_img,
+            E.dl_cnt,
+            (SELECT COUNT(*) FROM wt_like_info WHERE ref_seq = E.concept_room_seq AND sort = 'concept_room') as like_cnt,
+            E.vw_cnt,
+            E.upload_method,
+            DATE_FORMAT( E.reg_date, '%Y-%m-%d' ) AS reg_date,
+            F.admin_nm,
+            CONCAT(
+                '#',
+                (
+                SELECT
+                    GROUP_CONCAT(DISTINCT A.d_name SEPARATOR '#')
+                FROM
+                vn_room_div_d A
+                INNER JOIN vn_room_content_div B ON A.d_code = B.d_code
+                    INNER JOIN vn_concept_room C ON C.concept_room_seq = B.room_seq 
+                    INNER JOIN vn_room_div_h D ON D.h_code = A.h_code AND D.h_code = B.h_code
+                    WHERE C.concept_room_seq = E.concept_room_seq
+                )
+            ) AS style,
+            GROUP_CONCAT( DISTINCT I.product_cd SEPARATOR ',' ) AS product_cd
+        FROM
+            vn_room_div_d B
+            INNER JOIN vn_room_div_h C ON B.h_code = C.h_code
+            INNER JOIN vn_room_content_div D ON D.d_code = B.d_code AND D.h_code = C.h_code
+            LEFT JOIN vn_concept_room E ON E.concept_room_seq = D.room_seq
+            LEFT JOIN wt_admin F ON E.admin_id = F.admin_id
+            LEFT JOIN wt_code2 G ON G.code_cd2 = E.brand
+            LEFT JOIN vn_concept_room_object H ON H.concept_room_seq = E.concept_room_seq AND H.method = E.upload_method
+            LEFT JOIN vn_concept_room_opt I ON H.object_seq = I.object_seq
+        WHERE
+            E.del_yn = 'N' 
+            AND E.use_yn = 'Y' 
+            AND C.del_yn = 'N' 
+            AND C.use_yn = 'Y' 
+            AND B.del_yn = 'N' 
+            AND B.use_yn = 'Y' 
+            <if test="styles != null && styles != ''">
+                AND (
+                    <foreach collection="styles" open="(" close=")" separator="OR" item="style">
+                        (C.h_code = ${style.h_code} AND B.d_code = ${style.d_code})
+                    </foreach>
+                )
+            </if>
+        GROUP BY
+            E.concept_room_seq 
+        ORDER BY
+            <if test="filter == 'popular'">
+                  (SELECT COUNT(*) FROM wt_like_info
+                    WHERE
+                        ref_seq = E.concept_room_seq
+                        AND sort = 'concept_room') DESC
+            </if>
+            <if test="filter == 'newest'">
+                E.concept_room_seq DESC
+            </if>
+        LIMIT ${start_num}, ${row_count}
+    </select>
+
+    <select id="get_total_concept_room">
+        SELECT count(*) as cnt FROM (SELECT
+            E.concept_room_seq,
+            E.concept_room_nm,
+            G.code_nm2 AS brand,
+            E.thumbnail_img,
+            E.dl_cnt,
+            E.like_cnt,
+            E.vw_cnt,
+            E.upload_method,
+            DATE_FORMAT( E.reg_date, '%Y-%m-%d' ) AS reg_date,
+            F.admin_nm,
+            CONCAT('#', GROUP_CONCAT( DISTINCT B.d_name SEPARATOR '#' )) AS style,
+            GROUP_CONCAT( DISTINCT I.product_cd SEPARATOR ',' ) AS product_cd
+        FROM
+            vn_room_div_d B
+            JOIN vn_room_div_h C ON B.h_code = C.h_code
+            JOIN vn_room_content_div D ON D.d_code = B.d_code 
+            AND D.h_code = C.h_code
+            JOIN vn_concept_room E ON E.concept_room_seq = D.room_seq
+            JOIN wt_admin F ON E.admin_id = F.admin_id
+            JOIN wt_code2 G ON G.code_cd2 = E.brand 
+            JOIN vn_concept_room_object H ON H.concept_room_seq = E.concept_room_seq AND H.method = E.upload_method
+            JOIN vn_concept_room_opt I ON H.object_seq = I.object_seq
+        WHERE
+            E.del_yn = 'N' 
+            AND E.use_yn = 'Y' 
+            AND C.del_yn = 'N' 
+            AND C.use_yn = 'Y' 
+            AND B.del_yn = 'N' 
+            AND B.use_yn = 'Y' 
+            <if test="styles != null && styles != ''">
+                AND (
+                    <foreach collection="styles" open="(" close=")" separator="OR" item="style">
+                        (C.h_code = ${style.h_code} AND B.d_code = ${style.d_code})
+                    </foreach>
+                )
+            </if>
+        GROUP BY
+            E.concept_room_seq 
+        ORDER BY
+            E.concept_room_seq DESC) tbl
+    </select>
+
+    <select id="get_product_img">
+        SELECT
+                product_cd,
+                file_nm
+            FROM
+                wt_product_file 
+            WHERE
+                product_cd IN ( 
+                    <foreach collection="product" separator="," item="product_cd">
+                        #{product_cd}
+                    </foreach>
+                ) 
+            GROUP BY
+                product_cd
+    </select>
+
+    <select id="get_styles">
+        SELECT * FROM vn_room_div_h WHERE del_yn = 'N' AND use_yn = 'Y';
+        SELECT 
+            A.*
+        FROM 
+            vn_room_div_d A 
+            JOIN vn_room_div_h B ON A.h_code = B.h_code 
+        WHERE 
+            A.del_yn = 'N' 
+            AND A.use_yn = 'Y'
+            AND B.use_yn = 'Y'
+            AND B.del_yn = 'N';
+    </select>
+
+    <select id="get_product_lookup_list">
+         SELECT 
+                B.product_cd,
+                A.product_nm,
+                COUNT(B.product_cd) AS cnt,
+                C.code_nm2 AS brand_nm
+            FROM 
+                wt_product A
+                JOIN vn_concept_room_opt B ON A.product_cd = B.product_cd
+                JOIN wt_code2 C ON A.brand_cd = C.code_cd2
+                JOIN vn_concept_room_object D ON D.object_seq = B.object_seq 
+                JOIN vn_concept_room E ON E.concept_room_seq = D.concept_room_seq AND E.upload_method = D.method
+            WHERE
+                A.del_yn = 'N'
+                AND E.del_yn = 'N'
+                <if test="brand_cd != null && brand_cd != ''">
+                    AND A.brand_cd = #{brand_cd}                
+                </if>
+                <if test="product_cd != null && product_cd != ''">
+                    AND A.product_cd = #{product_cd}
+                </if>
+                <if test="product_nm != null && product_nm != ''">
+                    <bind name="product_nm" value="'%' + product_nm + '%'" />
+                    AND A.product_nm LIKE #{product_nm}             
+                </if>
+            GROUP BY 
+                B.product_cd
+            ORDER BY COUNT(B.product_cd) DESC
+            LIMIT ${start_num}, ${row_count}
+    </select>
+
+    <select id="get_room_lookup_by_id">
+        SELECT 
+            A.concept_room_seq,
+            A.concept_room_nm,
+            GROUP_CONCAT( DISTINCT D.view_nm SEPARATOR ', ' ) AS display,
+						E.product_cd,
+						E.product_nm
+        FROM 
+            vn_concept_room A
+            JOIN vn_concept_room_object B ON B.concept_room_seq = A.concept_room_seq AND B.method = A.upload_method
+            JOIN vn_concept_room_opt C ON C.object_seq = B.object_seq
+            JOIN vn_concept_room_view D ON D.concept_room_seq = A.concept_room_seq AND D.view_seq = B.view_seq AND A.upload_method = D.method
+            JOIN wt_product E ON E.product_cd = C.product_cd
+        WHERE
+            C.product_cd = #{product_cd}
+            AND A.del_yn = 'N'
+        GROUP BY 
+            A.concept_room_nm, A.concept_room_seq
+        ORDER BY 
+            A.concept_room_seq DESC
+    </select>
+
+    <select id="get_room_list">
+        SELECT
+            A.concept_room_seq,
+            A.concept_room_nm,
+            B.code_nm2 AS brand_nm,
+            DATE_FORMAT( A.reg_date, '%Y-%m-%d' ) AS reg_date,
+            CONCAT(
+                '#',
+            GROUP_CONCAT( D.d_name SEPARATOR '#' )) AS style,
+            (
+            SELECT
+                COUNT( DISTINCT tb1.product_cd ) 
+            FROM
+                vn_concept_room_opt tb1
+                LEFT JOIN vn_concept_room_object tb2 ON tb1.object_seq = tb2.object_seq 
+            WHERE
+                tb2.concept_room_seq = A.concept_room_seq 
+                AND tb2.method = A.upload_method 
+            ) AS product_cnt,
+        CASE
+                A.use_yn 
+                WHEN "N" THEN
+                "X" ELSE "O" 
+            END AS use_yn,
+            ( SELECT COUNT(*) FROM wt_comment C WHERE C.wno = A.concept_room_seq AND C.sort = 'concept_room' ) AS cmt_cnt,
+            A.vw_cnt 
+        FROM
+            vn_concept_room A
+            LEFT JOIN wt_code2 B ON A.brand = B.code_cd2
+            LEFT JOIN vn_room_content_div C ON C.room_seq = A.concept_room_seq
+            LEFT JOIN vn_room_div_d D ON D.h_code = C.h_code 
+            AND D.d_code = C.d_code
+            LEFT JOIN vn_room_div_h E ON E.h_code = C.h_code 
+            AND E.h_code = D.h_code 
+        WHERE
+            A.del_yn = 'N'
+            <if test="style != null && style != ''">
+                <bind name="style"  value="'%' + style + '%'"/>
+                AND D.d_name LIKE #{style}
+            </if>
+            <if test="concept_room_seq != null && concept_room_seq != ''">
+                AND A.concept_room_seq = ${concept_room_seq}
+            </if>
+            <if test="concept_room_nm != null && concept_room_name != ''">
+                <bind name="concept_room_nm" value="'%' + concept_room_nm + '%'" />
+                AND A.concept_room_nm LIKE #{concept_room_nm}
+            </if>
+            <if test="use_yn != null && use_yn != ''">
+                AND A.use_yn = #{use_yn}
+            </if>
+            <if test="brand_cd != null && brand_cd != ''">
+                AND A.brand = #{brand_cd}
+            </if>
+        GROUP BY
+            A.concept_room_nm 
+        ORDER BY
+            A.concept_room_seq DESC
+        LIMIT ${start_num}, ${row_count}
+    </select>
+
+    <select id="get_room_total">
+        SELECT COUNT(*) as cnt FROM (
+            SELECT
+                A.concept_room_seq,
+                A.concept_room_nm,
+                B.code_nm2 AS brand_nm,
+                DATE_FORMAT( A.reg_date, '%Y-%m-%d' ) AS reg_date,
+                CONCAT(
+                    '#',
+                GROUP_CONCAT( D.d_name SEPARATOR '#' )) AS style,
+                (
+                SELECT
+                    COUNT( DISTINCT tb1.product_cd ) 
+                FROM
+                    vn_concept_room_opt tb1
+                    LEFT JOIN vn_concept_room_object tb2 ON tb1.object_seq = tb2.object_seq 
+                WHERE
+                    tb2.concept_room_seq = A.concept_room_seq 
+                    AND tb2.method = A.upload_method 
+                ) AS product_cnt,
+            CASE
+                    A.use_yn 
+                    WHEN "N" THEN
+                    "X" ELSE "O" 
+                END AS use_yn,
+                ( SELECT COUNT(*) FROM wt_comment C WHERE C.wno = A.concept_room_seq AND C.sort = 'concept_room' ) AS cmt_cnt,
+                A.vw_cnt 
+            FROM
+                vn_concept_room A
+                LEFT JOIN wt_code2 B ON A.brand = B.code_cd2
+                LEFT JOIN vn_room_content_div C ON C.room_seq = A.concept_room_seq
+                LEFT JOIN vn_room_div_d D ON D.h_code = C.h_code 
+                AND D.d_code = C.d_code
+                LEFT JOIN vn_room_div_h E ON E.h_code = C.h_code 
+                AND E.h_code = D.h_code 
+            WHERE
+                A.del_yn = 'N'
+                <if test="style != null && style != ''">
+                    <bind name="style"  value="'%' + style + '%'"/>
+                    AND D.d_name LIKE #{style}
+                </if>
+                <if test="concept_room_seq != null && concept_room_seq != ''">
+                    AND A.concept_room_seq = ${concept_room_seq}
+                </if>
+                <if test="concept_room_nm != null && concept_room_name != ''">
+                    <bind name="concept_room_nm" value="'%' + concept_room_nm + '%'" />
+                    AND A.concept_room_nm LIKE #{concept_room_nm}
+                </if>
+                <if test="use_yn != null && use_yn != ''">
+                    AND A.use_yn = #{use_yn}
+                </if>
+                <if test="brand_cd != null && brand_cd != ''">
+                    AND A.brand = #{brand_cd}
+                </if>
+            GROUP BY
+                A.concept_room_nm 
+            ORDER BY
+                A.concept_room_seq DESC) tbl
+    </select>
+
+    <select id="get_product_lookup_by_id">
+        SELECT DISTINCT
+                    A.view_nm,
+                    B.concept_room_seq,
+                    B.concept_room_nm,
+                    D.product_cd,
+                (CASE WHEN D.product_cd IS NULL OR '' THEN '타사' ELSE '자사' END) AS class,
+                    (CASE WHEN D.product_cd IS NULL OR '' THEN D.product_nm ELSE E.product_nm END) AS product_nm
+            FROM 
+                vn_concept_room_view A
+                JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq AND A.method = B.upload_method
+                JOIN vn_concept_room_object C ON C.concept_room_seq = B.concept_room_seq AND A.view_seq = C.view_seq AND B.upload_method = C.method
+                JOIN vn_concept_room_opt D ON D.object_seq = C.object_seq
+                LEFT JOIN wt_product E ON E.product_cd = D.product_cd
+            WHERE 
+                A.concept_room_seq = ${concept_room_seq}
+                AND B.del_yn = 'N'
+            ORDER BY A.view_nm
+    </select>
+
+    <select id="get_product_total">
+        SELECT COUNT(*) as cnt FROM (
+            SELECT 
+                B.product_cd,
+                A.product_nm,
+                COUNT(B.product_cd) AS cnt,
+                C.code_nm2 AS brand_nm
+            FROM 
+                wt_product A
+                JOIN vn_concept_room_opt B ON A.product_cd = B.product_cd
+                JOIN wt_code2 C ON A.brand_cd = C.code_cd2
+                JOIN vn_concept_room_object D ON D.object_seq = B.object_seq 
+                JOIN vn_concept_room E ON E.concept_room_seq = D.concept_room_seq AND E.upload_method = D.method
+            WHERE
+                A.del_yn = 'N'
+                AND E.del_yn = 'N'
+                <if test="brand_cd != null && brand_cd != ''">
+                    AND A.brand_cd = #{brand_cd}                
+                </if>
+                <if test="product_cd != null && product_cd != ''">
+                    AND A.product_cd = #{product_cd}
+                </if>
+                <if test="product_nm != null && product_nm != ''">
+                    <bind name="product_nm" value="'%' + product_nm + '%'" />
+                    AND A.product_nm LIKE #{product_nm}             
+                </if>
+            GROUP BY 
+                B.product_cd
+            ORDER BY COUNT(B.product_cd) DESC) tbl
+    </select>
+
+    <select id="get_update_room">
+        SELECT * FROM vn_concept_room WHERE del_yn = 'N' AND concept_room_seq = ${concept_room_seq};
+
+        SELECT 
+            A.*
+        FROM
+            vn_concept_room_view A
+                JOIN
+            vn_concept_room B ON A.concept_room_seq = B.concept_room_seq
+        WHERE
+            A.concept_room_seq = ${concept_room_seq}
+                AND A.method = B.upload_method
+                AND B.del_yn = 'N';
+
+        SELECT 
+            A.*
+        FROM
+            vn_concept_room_object A
+                JOIN
+            vn_concept_room B ON B.concept_room_seq = A.concept_room_seq
+        WHERE
+            B.concept_room_seq = ${concept_room_seq}
+                AND A.method = B.upload_method
+                AND B.del_yn = 'N';
+                            
+                
+        SELECT 
+            A.*
+        FROM
+            vn_concept_room_opt A
+                JOIN
+            vn_concept_room_object B ON A.object_seq = B.object_seq
+                JOIN
+            vn_concept_room C ON C.concept_room_seq = B.concept_room_seq
+        WHERE
+            C.concept_room_seq = ${concept_room_seq}
+                AND B.method = C.upload_method
+                AND C.del_yn = 'N';
+                        
+        SELECT 
+            B.d_code, C.h_code
+        FROM
+            vn_room_content_div A
+                JOIN
+            vn_room_div_d B ON A.d_code = B.d_code
+                JOIN
+            vn_room_div_h C ON A.h_code = C.h_code
+                AND C.h_code = B.h_code
+                JOIN
+            vn_concept_room D ON D.concept_room_seq = A.room_seq
+        WHERE
+            A.room_seq = ${concept_room_seq}
+                AND D.del_yn = 'N';
+
+        SELECT
+            A.*
+        FROM
+            vn_room_outside_prd A
+            JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq
+        WHERE
+            A.concept_room_seq = ${concept_room_seq}
+            AND B.use_yn = 'Y'
+            AND B.del_yn = 'N'
+            AND B.upload_method = A.method;
+    </select>
+
+    <select id="get_room_slide">
+        SELECT 
+			A.* 
+		FROM 
+			vn_concept_room_view A 
+			JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq
+		WHERE 
+			A.concept_room_seq = ${concept_room_seq} 
+			AND A.method = #{method}
+			AND B.del_yn = 'N';
+
+		
+
+		SELECT 
+			A.* 
+		FROM 
+			vn_concept_room_object A
+			JOIN vn_concept_room B ON B.concept_room_seq = A.concept_room_seq
+		WHERE 
+			A.concept_room_seq = ${concept_room_seq} 
+			AND A.method = #{method}
+			AND B.del_yn = 'N';
+
+
+		SELECT
+			A.* 
+		FROM 
+			vn_concept_room_opt A
+			JOIN vn_concept_room_object B ON A.object_seq = B.object_seq
+			JOIN vn_concept_room C ON B.concept_room_seq = C.concept_room_seq
+		WHERE
+			C.concept_room_seq = ${concept_room_seq} 
+			AND C.upload_method = #{method}
+			AND C.del_yn = 'N' ;
+
+
+        SELECT
+            A.*
+        FROM
+            vn_room_outside_prd A
+            JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq
+        WHERE
+            A.concept_room_seq = ${concept_room_seq}
+            AND B.use_yn = 'Y'
+            AND B.del_yn = 'N'
+            AND B.upload_method = #{method};
+    </select>
+
+    <select id="get_brand">
+        SELECT * FROM wt_code2 WHERE code_cd1 = '900' and use_yn = 'Y' ORDER BY od asc
+    </select>
+
+    <select id="get_product">
+        SELECT
+        pro.product_cd,
+        pro.product_nm
+        FROM
+        wt_product pro
+        WHERE
+        1 = 1
+        and pro.product_type = 'N'
+        and pro.product_state = '2'
+        and pro.del_yn = 'N'
+    </select>
+
+    <insert id="insert_concept_room">
+        INSERT INTO vn_concept_room ( concept_room_nm, brand, state, thumbnail_img, bg_url, like_cnt, dl_cnt, vw_cnt, upload_method, use_yn, del_yn, admin_id, reg_date )
+        VALUES
+            (
+                #{concept_room_nm},
+                #{brand},
+                #{state},
+                #{thumbnail_img},
+                #{bg_url},
+                0,
+                0,
+                0,
+                #{upload_method},
+                #{use_yn},
+                'N',
+                #{admin_id},
+                NOW()
+            );
+    </insert>
+
+    <insert id="insert_room_style">
+        INSERT INTO vn_room_content_div (room_seq, h_code, d_code) VALUES 
+        <foreach collection="datas" item="data" separator=",">
+            (
+                ${concept_room_seq},
+                ${data.h_code},
+                ${data.d_code}
+            )
+        </foreach>
+    </insert>
+
+    <insert id="insert_room_view">
+        INSERT INTO vn_concept_room_view 
+        SET 
+            concept_room_seq = ${concept_room_seq},
+            view_nm = #{view_nm},
+            file_nm = #{file_nm},
+            method = #{method},
+            slide_url = #{slide_url}
+    </insert>
+
+    <insert id="insert_room_object">
+        INSERT INTO vn_concept_room_object 
+        SET 
+            view_seq = ${view_seq},
+            concept_room_seq = ${concept_room_seq},
+            thumbnail_img = #{thumbnail_img},
+            id = #{id},
+            child_obj = #{child_obj},
+            method = #{method},
+            coord_x = #{coord_x},
+            coord_y = #{coord_y},
+            object_pos_x = #{object_pos_x},
+            object_pos_y = #{object_pos_y},
+            width = #{width},
+            height = #{height},
+            od = ${od}
+    </insert>
+
+    <insert id="insert_room_option">
+        INSERT INTO vn_concept_room_opt 
+        SET 
+            object_seq = ${object_seq},
+            product_cd = #{product_cd},
+            id = #{id},
+            option_nm = #{option_nm},
+            thumbnail_img = #{thumbnail_img},
+            option_file_nm = #{option_file_nm},
+            product_nm = #{product_nm}
+    </insert>
+
+    <update id="update_room"> 
+         UPDATE 
+                vn_concept_room 
+            SET 
+                concept_room_nm =#{concept_room_nm},
+                brand =#{brand},
+                state =#{state},
+                thumbnail_img =#{thumbnail_img},
+                bg_url =#{bg_url},
+                upload_method =#{upload_method},
+                use_yn =#{use_yn},
+                admin_id =#{admin_id},
+                reg_date = NOW()
+            WHERE concept_room_seq = ${concept_room_seq}
+    </update>
+
+    <delete id="remove_room_object">
+        DELETE FROM vn_concept_room_opt WHERE object_seq IN (SELECT object_seq FROM vn_concept_room_object WHERE concept_room_seq = ${concept_room_seq} AND method = #{method});
+
+        DELETE FROM vn_concept_room_view WHERE concept_room_seq = ${concept_room_seq} AND method = #{method};
+        
+        DELETE FROM vn_concept_room_object WHERE concept_room_seq = ${concept_room_seq} AND method = #{method};
+        
+        DELETE FROM vn_room_content_div WHERE room_seq = ${concept_room_seq};
+
+        DELETE FROM vn_room_outside_prd WHERE concept_room_seq =  ${concept_room_seq} AND method = #{method};
+    </delete>
+
+    <update id="update_room_list">
+        UPDATE vn_concept_room SET 
+        <if test="concept_room_nm != null && concept_room_nm != ''">
+            concept_room_nm = #{concept_room_nm},
+        </if>
+        <if test="brand != null && brand != ''">
+            brand = #{brand},
+        </if>
+        <if test="state != null && state != ''">
+            state = #{state},
+        </if>
+        <if test="thumbnail_img != null && thumbnail_img != ''">
+            thumbnail_img = #{thumbnail_img},
+        </if>
+        <if test="bg_url != null && bg_url != ''">
+            bg_url = #{bg_url},
+        </if>
+        <if test="upload_method != null && upload_method != ''">
+            upload_method = #{upload_method},
+        </if>
+        <if test="use_yn != null && use_yn != ''">
+            use_yn = #{use_yn},
+        </if>
+        <if test="del_yn != null && del_yn != ''">
+            del_yn = #{del_yn},
+        </if>
+        reg_date = NOW()
+        WHERE concept_room_seq = ${concept_room_seq}
+    </update>
+
+    <insert id="insert_outside">
+        INSERT INTO vn_room_outside_prd (concept_room_seq, view_seq, x, y, product_nm, url, method)
+	    VALUES (${concept_room_seq}, ${view_seq}, #{x}, #{y}, #{product_nm}, #{url}, #{method});
+    </insert>
+
+    <select id="get_edit_info">
+        SELECT * 
+        FROM vn_concept_room_view A 
+        INNER JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq AND A.method = B.upload_method 
+        WHERE B.concept_room_seq = ${concept_room_seq};
+
+        SELECT * 
+        FROM vn_concept_room_object A 
+        INNER JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq AND A.method = B.upload_method
+        WHERE B.concept_room_seq = ${concept_room_seq};
+
+        SELECT * FROM vn_concept_room_opt A
+        INNER JOIN vn_concept_room_object B ON A.object_seq = B.object_seq 
+        INNER JOIN vn_concept_room C ON C.concept_room_seq = B.concept_room_seq AND C.upload_method = B.method
+        AND C.concept_room_seq = ${concept_room_seq};
+
+        SELECT * FROM vn_room_outside_prd A 
+        INNER JOIN vn_concept_room B ON A.concept_room_seq = B.concept_room_seq AND A.method = B.upload_method 
+        WHERE B.concept_room_seq = ${concept_room_seq};
+    </select>
+
+    <delete id="delete_info">
+        <if test="delete_view != null">
+            DELETE FROM vn_concept_room_view WHERE view_seq IN 
+                <foreach collection="delete_view" item="view_seq" open="(" close=");" separator=",">
+                    ${view_seq}
+                </foreach>
+        </if>
+
+        <if test="delete_object != null">
+            DELETE FROM vn_concept_room_object WHERE object_seq IN 
+            <foreach collection="delete_object" item="object_seq" open="(" close=");" separator=",">
+                ${object_seq}
+            </foreach>
+        </if>
+
+        <if test="delete_option != null">
+            DELETE FROM vn_concept_room_opt WHERE option_seq IN 
+            <foreach collection="delete_option" item="option_seq" open="(" close=");" separator=",">
+                ${option_seq}
+            </foreach>
+        </if>
+
+        <if test="delete_outside != null">
+            DELETE FROM vn_room_outside_prd WHERE id IN 
+            <foreach collection="delete_outside" item="id" open="(" close=");" separator=",">
+                ${id}
+            </foreach>
+        </if>
+    </delete>
+
+    <delete id="delete_style">
+        DELETE FROM vn_room_content_div WHERE room_seq = ${concept_room_seq}
+    </delete>
+</mapper>

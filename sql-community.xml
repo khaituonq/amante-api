@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="community">
+
+    <!--
+     * 집들이 리스트 불러오기
+     * @param  [type] $arrays    [description]
+     * @param  [type] $row_count [description]
+     * @param  [type] $start_num [description]
+     -->
+    <select id="get_list">
+        SELECT tb1.*
+                    ,(select count(*) from wt_comment where wno = tb1.event_seq and sort = 'sponsorship' ) comm_cnt
+                    FROM wt_sponsorship tb1
+                    WHERE 1=1
+                    and use_yn = 'Y'
+                    and del_yn = 'N'
+                    ORDER BY tb1.event_seq DESC
+                    <if test="row_count > 0 and start_num >= 0">
+                    LIMIT ${start_num}, ${row_count}
+                    </if>
+    </select>
+
+    <!--
+     * 집들이 정보 불러오기
+     * @param  [type] $product_cd [description]
+     * @return [type]             [description]
+     -->
+    <select id="get_view">
+        UPDATE wt_sponsorship SET hit = hit+1 WHERE event_seq = #{event_seq};
+        SELECT tb1.*
+                ,(select count(*) from wt_comment where wno = tb1.event_seq and sort = 'sponsorship' ) comm_cnt
+        FROM wt_sponsorship tb1
+        WHERE 1=1
+                and use_yn = 'Y'
+                and del_yn = 'N'
+                AND tb1.event_seq = #{event_seq};
+    </select>
+
+    <!--
+     * 관련상품 리스트 불러오기
+     * @param  [type] $product_cd [description]
+     * @return [type]             [description]
+     ifnull((SELECT 'on' FROM wt_wishlist WHERE product_cd = tb1.relation_product_cd AND cust_seq = #{cust_seq} LIMIT 1 ),'') AS wish_click_on
+     -->
+    <select id="get_relation_product_list">
+        SELECT tb1.*, tb2.*
+                        , (select count(*) from wt_use_review where product_cd = tb2.product_cd and use_yn = 'Y') as review_cnt
+                        , ifnull((select round(avg(POINT),1) from wt_use_review where product_cd = tb2.product_cd),0) as review_avg_point
+                        , ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img,
+                        <if test="cust_seq != null">
+                            CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = tb1.relation_product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on
+                        </if>
+                        
+                        <if test="cust_seq == null">
+                            'N' wish_click_on
+                        </if>
+        FROM wt_sponsorship_relation tb1
+        LEFT JOIN wt_product tb2
+                    ON tb2.product_cd = tb1.relation_product_cd
+        WHERE event_seq = #{event_seq}
+                    ORDER BY relation_seq
+    </select>
+
+    <!-- 
+     * 댓글 리스트 count 불러오기
+     * @param  [type] $arrays [description]
+    -->
+    <select id="get_comment_total">
+        SELECT count(*) as count
+                    FROM wt_comment tb1
+        WHERE wno = #{event_seq}
+                    and sort = 'sponsorship'
+                    and del = 'N'
+    </select>
+
+    <!--
+     * 댓글 리스트 불러오기
+     * @param  [type] $product_cd [description]
+     * @return [type]             [description]
+    -->
+    <select id="get_comment_list">
+        SELECT *
+                    FROM wt_comment
+        WHERE wno = #{event_seq}
+                    and sort = 'sponsorship'
+                    and del = 'N'
+                    ORDER BY no desc
+        <if test="row_count > 0 and start_num >= 0">
+                    LIMIT ${start_num}, ${row_count}
+        </if>
+    </select>
+
+
+</mapper>

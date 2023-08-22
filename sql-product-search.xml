@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//reviewEN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="product-search">
+
+  <select id="get-category-cnt">
+    SELECT  
+      count(*) as cnt
+      ,tb3.category_nm AS cate_nm1
+      ,tb3.category_cd AS cate_cd1
+      ,tb4.category_nm AS cate_nm2
+      ,tb4.category_cd AS cate_cd2
+    FROM wt_product tb1
+    LEFT JOIN	wt_product_category tb2 ON tb1.product_cd = tb2.product_cd
+    LEFT JOIN	wt_category tb3 ON tb2.category1_cd = tb3.category_cd
+    LEFT JOIN	wt_category tb4 ON tb2.category2_cd = tb4.category_cd
+    WHERE 1=1
+      AND tb1.product_cd = tb2.product_cd
+      AND tb1.product_type = 'N'
+      AND tb1.product_state not in ('1','3')
+      AND tb1.del_yn ='N'
+      AND <![CDATA[tb3.category_cd <> '12']]>
+      AND tb3.use_yn ='Y'
+      AND tb4.use_yn ='Y'
+      <if test="keyword != '' and keyword != undefined ">
+      and ( tb1.product_nm REGEXP #{replaceKeyword} or tb1.keywd REGEXP #{replaceKeyword} or tb1.product_nm_eng REGEXP #{replaceKeyword}
+                          or tb1.brand_cd in (SELECT code_cd2 FROM wt_code2 WHERE code_nm2 REGEXP #{replaceKeyword} )
+                          or tb1.product_nm LIKE #{replaceKeyword2} or tb1.keywd LIKE #{replaceKeyword2} or tb1.product_nm_eng LIKE #{replaceKeyword2}
+                          or tb1.brand_cd in (SELECT code_cd2 FROM wt_code2 WHERE code_nm2 LIKE #{replaceKeyword2}
+            or FIND_IN_SET(#{replaceKeyword},tb1.product_cd)
+            )
+                        ) 
+      </if>
+    GROUP BY cate_cd2
+  </select>
+
+</mapper>

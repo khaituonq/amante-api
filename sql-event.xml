@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="event">
+	<!-- sample -->
+	<select id="testBasic">
+		SELECT now()
+	</select>
+
+
+
+	<select id="concept-room-getConcept_area_list">
+		SELECT
+			concept_room_nm, file_nm1, brand_cd, house_type, space, size, style, concept_room_seq
+		FROM 
+			wt_concept_room
+		WHERE
+			use_yn = 'Y'
+		ORDER BY
+			rand()
+		LIMIT 10
+	</select>
+
+
+
+	<select id="concept-room-getList">
+		SELECT
+			tb1.concept_room_nm, tb1.file_nm1, tb1.concept_room_seq,
+			( 
+				SELECT COUNT(*) FROM wt_concept_room WHERE use_yn='Y' 
+				<if test="house_type != null && house_type != ''">
+					AND house_type LIKE '%${house_type}%'
+				</if>
+				<if test="space != null && space != ''">
+					AND space LIKE '%${space}%'
+				</if>
+				<if test="style != null && style != ''">
+					AND style LIKE '%${style}%'
+				</if>
+				<if test="size != null && size != ''">
+					AND size LIKE '%${size}%'
+				</if>
+			) AS 'room_cnt',
+			tb1.brand_cd,
+			tb1.house_type,
+			tb1.space,
+			tb1.size,
+			tb1.style,
+			tb3.sale_price
+		FROM 
+			/* wt_concept_room tb1, wt_concept_room_product tb2, wt_product tb3 */
+			/* 조인했는데 where 절을 안걸어줘서 속도 이슈로 인해 쿼리 수정 */
+			wt_concept_room tb1
+			LEFT JOIN wt_concept_room_product tb2
+				ON tb2.concept_room_seq = tb1.concept_room_seq
+		
+			LEFT JOIN wt_product tb3
+				ON tb3.product_cd = tb2.relation_product_cd
+		WHERE
+			tb1.use_yn = 'Y'
+			<if test="house_type != null && house_type != ''">
+				AND house_type LIKE '%${house_type}%'
+			</if>
+			<if test="space != null && space != ''">
+				AND space LIKE '%${space}%'
+			</if>
+			<if test="style != null && style != ''">
+				AND style LIKE '%${style}%'
+			</if>
+			<if test="size != null && size != ''">
+				AND size LIKE '%${size}%'
+			</if>
+		GROUP BY 
+			concept_room_seq
+		ORDER BY
+			tb1.od DESC, ${order}
+		LIMIT ${start_num}, ${row_count}
+	</select>
+
+
+
+	<select id="concept-room-getCode">
+		SELECT * FROM wt_code2 WHERE code_cd1 = #{code}
+	</select>
+
+
+	
+	<select id="concept-room-getView">
+		<if test="mode == 'admin'">
+			SELECT * FROM wt_concept_room WHERE concept_room_seq = #{concept_room_seq}
+		</if>
+		<if test="mode != 'admin'">
+			SELECT * FROM wt_concept_room WHERE use_yn = 'Y' and concept_room_seq = #{concept_room_seq}
+		</if>
+	</select>
+
+
+
+
+
+	<select id="concept-room-getRelationProduct">
+		SELECT 
+			*
+		FROM 
+			wt_concept_room_product tb1
+		WHERE 
+			concept_room_seq = #{concept_room_seq}
+	</select>
+
+
+	<select id="concept-room-getProductInfo">
+		SELECT 
+			* 
+		FROM 
+			wt_product tb1 
+		JOIN 
+			wt_product_file  tb2
+		ON 
+			tb1.product_cd = tb2.product_cd
+		WHERE 
+			tb1.product_cd = #{product_cd}
+			AND	tb2.file_gb = 'P' 
+		ORDER BY 
+			tb2.od LIMIT 1
+	</select>
+
+
+	<update id="concept-room-update_hit">
+		UPDATE wt_concept_room SET vw_cnt = vw_cnt+1 WHERE concept_room_seq = #{concept_room_seq}
+	</update>
+
+
+	<!--
+	## 배너 가져오기
+	-->
+	<select id="concept-room-get_banner">
+		SELECT 
+			* 
+		FROM 
+			wt_banner 
+		WHERE 
+			banner_cd = #{cd} 
+			AND use_yn ='Y' 
+			AND display_Sdate < NOW() 
+			AND display_Edate > NOW()
+		ORDER BY 
+			od ASC, reg_date DESC LIMIT 1
+	</select>
+
+
+
+
+
+
+	<select id="insert_like_info">
+		INSERT
+			wt_like_info
+		SET
+			ref_seq = #{ref_seq},
+			sort = #{sort},
+			gubun = #{gubun},
+			user_id = #{user_id},
+			cust_seq = #{cust_seq},
+			reg_date = NOW()
+	</select>
+
+
+
+
+
+	<select id="delete_like_info">
+		DELETE FROM wt_like_info WHERE sort = #{sort} AND ref_seq = #{ref_seq} AND cust_seq = #{cust_seq}
+	</select>
+
+
+
+
+
+	<select id="insert_comment">
+		INSERT
+			wt_use_review_comment
+		SET
+			use_review_seq = #{use_review_seq},
+			cust_seq = #{cust_seq},
+			user_id = #{user_id},
+			user_nm = #{user_nm},
+			comment = #{comment},
+			reg_date = now()
+	</select>
+
+
+	
+	<select id="user_like_yn">
+		SELECT COUNT(*) as count FROM wt_like_info WHERE sort=#{sort} AND ref_seq=${ref_seq} AND cust_seq = ${cust_seq}
+	</select>
+
+
+</mapper>

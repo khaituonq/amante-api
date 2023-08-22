@@ -1,0 +1,1601 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="mypage">
+	<!-- sample -->
+	<select id="testBasic">
+		SELECT now()
+	</select>
+	<!-- ## 배송지 목록 가져오기 (주문) -->
+	<select id="info-order_addr_list">
+		SELECT mem_addr_seq, cust_nm, hp, home_zip, home_addr1, home_addr2, delivery_msg 
+		FROM wt_member_addr WHERE cust_seq = #{cust_seq} and addr_gb = 'M'
+		<if test="mem_addr_seq != null || mem_addr_seq != ''">
+		or mem_addr_seq = ${mem_addr_seq}
+		</if>
+		group by cust_nm, hp, home_zip, home_addr1, home_addr2
+		ORDER BY default_yn ASC, mem_addr_seq DESC
+	</select>
+	<select id="info-get_count">
+		SELECT count(*) as count FROM wt_cart tb1, wt_product tb2
+		WHERE
+			tb1.product_cd = tb2.product_cd
+			AND tb1.use_yn = 'N'
+			AND tb1.iscurr = 'F'
+			AND tb2.product_state = '2'
+			AND tb2.del_yn = 'N'
+			AND tb1.cust_seq = #{cust_seq}
+	</select>
+	<select id="info-getSNSImage">
+		SELECT sns_img FROM wt_member_sns_info WHERE cust_seq = #{cust_seq}
+	</select>
+	<select id="info-leave">
+		select join_gb where wt_member where cust_seq = #{cust_seq}
+	</select>
+	<update id="info-leave2">
+		UPDATE
+		SET
+			join_gb = null,
+			member_grp_cd = null,
+			passwd = null,
+			pass_change_date = null,
+			user_nm = null,
+			mb_reserve = null,
+			birthday = null,
+			phone = null,
+			email = null,
+			home_zip = null,
+			home_addr1 = null,
+			home_addr2 = null,
+			mod_date = null,
+			mailing_yn = null,
+			sms_yn = null,
+			out_yn = 'Y',
+			out_date = now(),
+			last_login_date = null,
+			join_path = null,
+			join_path_text = null,
+			reference_id = null,
+			ip = null,
+			callback_date = null,
+			pass_err_cnt = null,
+			pass_err_date = null,
+			tendecy = null
+		<if test="join_gb == 'K'">
+			, user_id = null
+		</if>
+		WHERE
+			cust_seq = #{cust_seq}
+	</update>
+	<delete id="info-leave3">
+		DELETE FROM wt_member_sns_info WHERE cust_seq = #{cust_seq}
+	</delete>
+	<!--
+	TODO
+	-->
+	<update id="info-set_member_update">
+		UPDATE
+		SET
+		WHERE
+			cust_seq = #{cust_seq}
+	</update>
+	<!--
+	## 배송지 기본값 N 으로 설정 
+	-->
+	<update id="info-update_default_addr">
+		UPDATE wt_member_addr SET default_yn = 'N' WHERE cust_seq = #{cust_seq}
+	</update>
+	<!--
+	## 배송지 등록 TODO
+	-->
+	<insert id="info-insert_addr">
+		INSERT INTO wt_member_addr()
+		values()
+	</insert>
+	<!--
+	## 배송지 목록 가져오기 (마이페이지)
+	-->
+	<select id="addr_list">
+		SELECT * 
+		FROM wt_member_addr 
+		WHERE cust_seq = #{cust_seq}
+		<if test="addr_gb != ''">
+			AND addr_gb = #{addr_gb}
+		</if>
+		ORDER BY default_yn ASC, mem_addr_seq DESC
+	</select>
+	<!--
+	## 배송지 목록 가져오기 (주문) - 오류 있는것 같음
+	-->
+	<select id="info-order_addr_list">
+		SELECT 
+			mem_addr_seq, cust_nm, hp, home_zip, home_addr1, home_addr2, delivery_msg 
+		FROM wt_member_addr 
+		WHERE 
+			cust_seq = #{cust_seq} and addr_gb = 'M'
+		<if test="mem_addr_seq != null and mem_addr_seq != ''">
+				or mem_addr_seq = #{mem_addr_seq}
+			</if>
+		group by cust_nm, hp, home_zip, home_addr1, home_addr2
+		ORDER BY default_yn ASC, mem_addr_seq DESC
+	</select>
+	<!--
+	## 배송지 목록 가져오기 (최근배송지)) - 삭제됨
+	SELECT * FROM wt_member_addr WHERE cust_seq = '$cust_seq' AND addr_gb = 'O' ORDER BY reg_date DESC
+	-->
+	<!--
+	## 배송지 내용 가져오기
+	-->
+	<select id="info-get_addr">
+		SELECT * FROM wt_member_addr WHERE mem_addr_seq = #{no}
+	</select>
+	<!--
+	## 배송지 내용 업데이트 TODO
+	-->
+	<update id="info-update_addr">
+		UPDATE wt_member_addr
+		SET
+		WHERE
+			mem_addr_seq = #{mem_addr_seq}
+	</update>
+	<!--
+	## 배송지 삭제(단일)
+	-->
+	<delete id="info-delete_addr">
+		DELETE FROM wt_member_addr WHERE mem_addr_seq = #{mem_addr_seq} and cust_seq = #{cust_seq}
+	</delete>
+	<!--
+	## sns 연동 해제
+	-->
+	<delete id="info-sns_deconnect">
+		DELETE FROM wt_member_sns_info WHERE sns_seq = #{sns_seq} and cust_seq = #{cust_seq}
+	</delete>
+	<!--
+	## 패스워드 체크 - 패스워드는 변경된 상태로 와야 함
+	-->
+	<select id="info-checkPass">
+		SELECT COUNT(*) as count FROM wt_member WHERE cust_seq = #{cust_seq}  AND passwd = #{passwd}
+	</select>
+	<!--
+	## 패스워드 변경 - 패스워드는 암호화 해서 와야 함
+	-->
+	<update id="info-changePass">
+		UPDATE wt_member
+		SET
+			passwd = #{passwd},
+			pass_change_date = now()
+		WHERE
+			cust_seq = #{cust_seq}
+	</update>
+	<!--
+	## 비밀번호 가져오기
+	-->
+	<select id="info-getPass">
+		SELECT passwd FROM wt_member WHERE cust_seq = #{cust_seq}
+	</select>
+	<!--
+	## 마이페이지 네이버 계정 연동 - TODO
+	-->
+	<insert id="info-naver_sns_connect">
+		INSERT INTO wt_member_sns_info()
+		values()
+	</insert>
+	<!--
+	## 마이페이지 카카오 계정 연동
+	-->
+	<insert id="info-kakao_sns_connect">
+		INSERT INTO wt_member_sns_info()
+		values()
+	</insert>
+	<!--
+	## 최근배송지를 마이페이지 배송지로 변경
+	-->
+	<update id="info-set_mypage_addr">
+		UPDATE wt_member_addr
+		SET 
+			addr_gb = 'M'
+		WHERE
+			mem_addr_seq = #{mem_addr_seq}
+	</update>
+	<!--
+	## 최근주문정보
+	-->
+	<select id="info-get_last_order_info">
+		select tb1.reg_date, tb1.order_price, tb1.ocode
+				, (SELECT count(*) FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' ) p_cnt
+				, (SELECT product_nm FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' order by product_ocode asc limit 1 ) product_nm
+		from wt_order_info tb1 
+		WHERE cust_seq=#{cust_seq} and order_yn = 'Y' 
+		ORDER BY reg_date DESC 
+		limit 0,5
+	</select>
+	<!--
+	## 오늘 출석체크 했는지 여부
+	-->
+	<select id="info-today_chk">
+		SELECT COUNT(*) AS cnt 
+		FROM wt_event_board
+		WHERE event_seq = '24' 
+			AND cust_seq = #{cust_seq} 
+			AND DATE_FORMAT(reg_date, '%Y-%m-%d') = DATE_FORMAT(NOW(), '%Y-%m-%d')
+	</select>
+	<!--
+	## 출석체크하기 TODO
+	-->
+	<insert id="info-check_in">
+		INSERT INTO wt_event_board() 
+		values()
+	</insert>
+	<!--
+	## 이번달 출석체크 완료 일자 보기
+	-->
+	<select id="info-month_chk">
+		SELECT DATE_FORMAT(reg_date, '%d') AS days 
+		FROM wt_event_board 
+		WHERE event_seq = '24' 
+			AND cust_seq = #{cust_seq} 
+			AND DATE_FORMAT(reg_date, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+	</select>
+	<!--
+	## 오늘 ~ 15일전까지 출석체크한 일자 ( 쿠폰 지급용 )
+	-->
+	<select id="info-month_chk_total">
+		SELECT COUNT(*) AS cnt FROM wt_event_board
+		WHERE event_seq = '24'
+			AND cust_seq = #{cust_seq}
+			AND ( DATE_FORMAT(reg_date, '%Y-%m-%d')
+		<![CDATA[ <= ]]> DATE_FORMAT(NOW(), '%Y-%m-%d') )
+			AND ( DATE_FORMAT(reg_date, '%Y-%m-%d') >= DATE_FORMAT(date_add(now(), interval -15 day), '%Y-%m-%d') )
+	</select>
+	<!--
+	## 출석체크 전용 쿠폰 정보 가져오기
+	-->
+	<select id="info-check_coupon_info">
+		SELECT tb1.coupon_seq, coupon_master_seq, title
+			,(SELECT coupon_number 
+				FROM wt_coupon_number 
+				WHERE coupon_seq = tb1.coupon_seq AND coupon_master_seq = tb1.coupon_master_seq AND use_yn ='Y') AS coupon_number
+		FROM wt_coupon tb1
+		WHERE coupon_seq = #{coupon_seq}
+	</select>
+	<!--
+	## 출석체크 전용 쿠폰 발급 - TODO
+	-->
+	<insert id="info-insert_check_coupon">
+		INSERT INTO wt_coupon_member()
+		values()
+	</insert>
+	<!--
+	## 마이페이지 인덱스 상단의 회원등급, 적립금, 쿠폰 개수
+	-->
+	<select id="info-get_mypage_top_info">
+		SELECT tb1.cust_seq, user_id, user_nm, mb_reserve
+			,(SELECT member_grp_nm 
+				FROM wt_member_grp 
+				WHERE tb1.member_grp_cd = member_grp_cd AND use_yn ='Y') AS member_grp_nm
+			,(SELECT COUNT(*) 
+				FROM wt_coupon_member member  
+				WHERE cust_seq = tb1.cust_seq AND use_yn = 'N' AND member.s_date
+		<![CDATA[ <= ]]> NOW() AND member.e_date >= NOW() ) coupon_cnt
+		FROM wt_member tb1
+		WHERE cust_seq = #{cust_seq}
+	</select>
+	<!--
+	## 내 게시물
+	-->
+	<select id="info-getNewMyList">
+		SELECT event_seq AS seq, event_nm AS title, reg_date, '집들이' AS sort, event_seq , event_seq AS event_board_seq  
+		FROM wt_housewarming 
+		WHERE writer_id = #{user_id}  AND use_yn='Y'
+			UNION
+		SELECT event_seq AS seq, title, reg_date, '이벤트' AS sort, event_seq, event_board_seq  
+		FROM wt_event_board 
+		WHERE cust_seq = #{cust_seq}  AND use_yn='Y'
+		ORDER BY event_board_seq DESC
+		<if test="type == 'index'">
+			LIMIT 1
+		</if>
+	</select>
+	<!--
+	## wt_push_master 테이블에 push 동의설정값 가져오기
+	-->
+	<select id="info-get_push_state">
+		SELECT pd_push_yn, pd_ad_yn, pd_night_yn 
+		FROM wt_push_master 
+		WHERE pd_device_id = #{device_id}
+	</select>
+	<!--
+	## wt_push_master 테이블 pd_push_yn 설정 (푸시)
+	-->
+	<update id="info-push_refusal">
+		UPDATE wt_push_master
+		SET
+			pd_push_yn = #{pd_push_yn},
+			pd_update_dt = now()
+		WHERE
+			pd_device_id = #{pd_device_id}
+	</update>
+	<!--
+	## wt_push_master 테이블 pd_ad_yn 설정 (푸시)
+	-->
+	<update id="info-ad_refusal">
+		UPDATE wt_push_master
+		SET
+			pd_ad_yn = #{pd_ad_yn},
+			pd_update_dt = now()
+		WHERE
+			pd_device_id = #{pd_device_id}
+	</update>
+	<!--
+	## wt_push_master 테이블 pd_night_yn 설정 (푸시)
+	-->
+	<update id="info-night_refusal">
+		UPDATE wt_push_master
+		SET
+			pd_night_yn = #{pd_night_yn},
+			pd_update_dt = now()
+		WHERE
+			pd_device_id = #{pd_device_id}
+	</update>
+	<!--
+	## push_list 가져오기
+	-->
+	<select id="info-get_push_list">
+		SELECT * 
+		FROM wt_push_message tb1, wt_push_message_effect tb2 
+		WHERE tb1.effect_seq = tb2.effect_seq 
+			AND tb1.p_device_id = #{device_id}
+			AND tb1.p_push_yn = 'Y'
+			AND tb1.p_status = 1 
+		ORDER BY p_push_id desc
+	</select>
+	<select id="coupon-getList">
+		SELECT
+			*
+		FROM
+			(
+			SELECT
+				master.sale_target,
+				coupon.title AS title,
+				coupon.content AS content,
+				member.coupon_member_seq AS seq,
+				member.use_yn AS use_yn,
+				LEFT ( member.s_date, 10 ) AS s_date,
+				LEFT ( member.e_date, 10 ) AS e_date,
+				member.use_date AS use_date,
+				master.coupon_gb AS coupon_gb,
+				master.coupon_value AS coupon_value,
+				master.min_price as min_price,
+				master.file_nm AS coupon_img,
+				master.content AS limitation,
+				master.coupon_site_gb AS coupon_site_gb,
+				master.coupon_mile_gb AS coupon_mile_gb,
+				member.reg_date AS reg_date,
+				member.coupon_member_seq,
+				case when master.sale_target = '2' then
+							(SELECT GROUP_CONCAT(tb1.product_nm,'
+		<![CDATA[<br>]]>') AS use_product from wt_product tb1, wt_coupon_relation tb2 WHERE tb1.product_cd = tb2.relation_product_cd AND tb2.coupon_master_seq = master.coupon_master_seq)
+					 when master.sale_target = '1' then
+							(CONCAT_WS(',', (SELECT IFNULL(category_nm,'') FROM wt_category tb1 WHERE master.coupon_category1_cd = tb1.category_cd AND LEVEL = '1') ,
+											(SELECT IFNULL(category_nm,'') FROM wt_category tb1 WHERE master.coupon_category2_cd = tb1.category_cd AND LEVEL = '2') ,
+											(SELECT IFNULL(category_nm,'') FROM wt_category tb1 WHERE master.coupon_category3_cd = tb1.category_cd AND LEVEL = '3')
+									   )
+							 )
+				end AS use_product_nm
+
+			FROM
+				wt_coupon AS coupon
+				INNER JOIN wt_coupon_member AS member ON coupon.coupon_seq = member.coupon_seq
+				INNER JOIN wt_coupon_master AS master ON coupon.coupon_master_seq = master.coupon_master_seq
+			WHERE
+				member.cust_seq = #{cust_seq} AND member.use_yn = 'N'
+			) AS tb1,
+			( SELECT COUNT( IF ( use_yn = 'Y', use_yn, NULL ) ) AS used_count FROM wt_coupon_member WHERE cust_seq = #{cust_seq} ) AS tb2,
+			( SELECT COUNT( IF ( use_yn = 'N' AND adddate(e_date, 1) >= NOW(), use_yn, NULL ) ) AS not_used_count FROM wt_coupon_member WHERE cust_seq = #{cust_seq} ) AS tb3,
+			( SELECT COUNT( * ) AS total_count FROM wt_coupon_member WHERE cust_seq = #{cust_seq} ) AS tb4
+			ORDER BY
+				reg_date DESC, e_date ASC, tb1.coupon_member_seq DESC
+	</select>
+	<select id="coupon-getCuponNumberData">
+		SELECT coupon_number, coupon_seq, coupon_master_seq, use_yn FROM wt_coupon_number WHERE coupon_number = #{coupon_number}
+	</select>
+	<select id="coupon-getUseGb">
+		SELECT coupon_use_gb FROM wt_coupon_master WHERE coupon_master_seq = #{coupon_master_seq}
+	</select>
+	<select id="coupon-getDatePeriod">
+		SELECT s_date, e_date FROM wt_coupon WHERE coupon_seq = #{coupon_seq}
+	</select>
+	<select id="coupon-isMemberIssued">
+		SELECT * 
+		FROM wt_coupon_member 
+		WHERE coupon_seq = #{coupon_seq} and 
+			coupon_master_seq = #{coupon_master_seq} and cust_seq = #{cust_seq}
+	</select>
+	<update id="coupon-issue">
+		UPDATE wt_coupon_number
+		SET use_yn = 'Y'
+		WHERE coupon_number = #{coupon_number}
+	</update>
+	<!--
+	TODO
+	-->
+	<insert id="coupon-issue2">
+		/*
+		paramI.coupon_master_seq			= coupon_data['coupon_master_seq'];
+		paramI.cust_seq						= cust_seq;
+		paramI.user_id						= user_id;
+		paramI.use_yn						= "N";
+		paramI.s_date						= date_period['s_date'];
+		paramI.e_date						= date_period['e_date'];
+		paramI.coupon_number				= coupon_number;
+		paramI.reg_date						= fc.getDate();
+		*/
+		INSERT INTO wt_coupon_member(
+			coupon_master_seq, 
+			coupon_seq,
+			cust_seq,
+			user_id,
+			use_yn, 
+			s_date,
+			e_date,
+			coupon_number,
+			reg_date
+		)
+		values(
+			#{coupon_master_seq},
+			#{coupon_seq},
+			#{cust_seq},
+			#{user_id},
+			#{use_yn}, 
+			#{s_date},
+			#{e_date},
+			#{coupon_number},
+			now()
+		)
+	</insert>
+	<select id="coupon-getJoinIssueCoupon">
+		SELECT
+			tb1.coupon_master_seq,
+			tb2.coupon_seq,
+			tb2.s_date,
+			tb2.e_date
+		FROM
+			wt_coupon_master tb1
+			INNER JOIN wt_coupon tb2 ON tb1.coupon_master_seq = tb2.coupon_master_seq
+		WHERE
+			tb1.coupon_member_gb = 1
+			AND tb1.coupon_state = 1
+			AND tb2.s_date
+		<![CDATA[ <= ]]> now() AND adddate(tb2.e_date, 1) >= now()
+	</select>
+	<!--
+	## 로그인/회원가입 발급 쿠폰 확인여부 Y로 업데이트
+	-->
+	<update id="coupon-update_chk">
+		UPDATE wt_coupon_member tb1, wt_coupon_master tb2 
+		SET tb1.chk_yn = 'Y'
+		WHERE tb1.coupon_master_seq = tb2.coupon_master_seq
+			AND tb1.cust_seq = #{cust_seq}
+			AND (tb2.coupon_member_gb ='1' OR tb2.coupon_login_gb = '1' )
+			AND tb1.chk_yn = 'N'
+	</update>
+	<select id="deposit-getTotal">
+		SELECT
+			*
+		FROM
+			( SELECT new_mlg FROM wt_deposit WHERE cust_seq = #{cust_seq} ORDER BY reg_date DESC LIMIT 0, 1 ) AS tb1,
+			( SELECT SUM( IF ( state = 'M', mlg, 0 ) ) AS used_deposit FROM wt_deposit WHERE cust_seq = #{cust_seq} ) AS tb2,
+			( SELECT SUM( IF ( state = 'P', mlg, 0 ) ) AS total_deposit FROM wt_deposit WHERE cust_seq = #{cust_seq} ) AS tb3
+	</select>
+	<select id="deposit-getTotalCount">
+		SELECT COUNT(*) AS count FROM wt_deposit WHERE cust_seq = #{cust_seq}
+	</select>
+	<select id="deposit-getList">
+		SELECT
+			*
+		FROM
+			wt_deposit
+		WHERE
+			cust_seq = #{cust_seq}
+		ORDER BY
+			deposit_seq DESC
+		LIMIT ${start_num}, ${row_count}
+	</select>
+	<select id="deposit-getReferenceUserNm">
+		SELECT
+			tb1.user_nm
+		FROM
+			wt_member tb1
+			INNER JOIN wt_member tb2 ON tb1.cust_seq = tb2.cust_seq
+		WHERE
+			tb2.reference_id = #{user_id}
+		ORDER BY
+			tb1.deposit_seq desc
+	</select>
+	<!-- 
+	MEMBER
+	passwd, changepass, getpass 는 info 의 쿼리 사용
+	-->
+	<select id="member-getSNSInfoFromCustSeq">
+		SELECT
+			sns_seq, member_gb, reg_date, sns_id
+		FROM
+			wt_member_sns_info
+		WHERE
+			cust_seq = #{cust_seq}
+	</select>
+	<select id="member-getSNSInfoFromSeq">
+		SELECT
+			cust_seq
+		FROM
+			wt_member_sns_info
+		WHERE
+			sns_seq = #{sns_seq}
+	</select>
+	<delete id="member-destroySNS">
+		DELETE FROM wt_member_sns_info where sns_seq = #{sns_seq}
+	</delete>
+	<select id="member-get_mem_info">
+		SELECT *,
+			(SELECT member_gb FROM wt_member_sns_info WHERE cust_seq=wt_member.cust_seq LIMIT 1) AS member_gb 
+		FROM wt_member
+		WHERE
+			cust_seq = #{cust_seq}
+	</select>
+	<!--
+	TODO 필드들 정리 안되어 있음
+	-->
+	<update id="member-set_member_update">
+		UPDATE wt_member
+		SET
+			phone = #{phone}
+		WHERE
+			cust_seq = #{cust_seq}
+	</update>
+	<select id="mileage-getTotal">
+		SELECT
+			*
+		FROM
+			( SELECT new_mlg AS now_mlg FROM wt_reserve WHERE cust_seq = #{cust_seq} ORDER BY reserve_seq DESC LIMIT 0, 1 ) AS tb1,
+			( SELECT SUM( IF ( state = 'M', mlg, 0 ) ) AS used_mlg FROM wt_reserve WHERE cust_seq = #{cust_seq} ) AS tb2,
+			( SELECT SUM( IF ( state = 'P', mlg, 0 ) ) AS total_mlg FROM wt_reserve WHERE cust_seq = #{cust_seq} ) AS tb3
+	</select>
+	<select id="mileage-getTotalCount">
+		SELECT COUNT(*) AS count FROM wt_reserve WHERE cust_seq = #{cust_seq}
+	</select>
+	<select id="mileage-getList">
+		SELECT
+			*
+		FROM
+			wt_reserve
+		WHERE
+			cust_seq = #{cust_seq}
+		ORDER BY
+			reserve_seq DESC
+		LIMIT ${start_num}, ${row_count}
+	</select>
+	<select id="mileage-getReferenceUserNm">
+		SELECT
+			tb1.user_nm
+		FROM
+			wt_member tb1
+			INNER JOIN wt_member tb2 ON tb1.cust_seq = tb2.cust_seq
+		WHERE
+			tb2.reference_id = #{user_id}
+		ORDER BY
+			tb1.cust_seq desc
+	</select>
+	<!--
+	나의 주문목록 조회
+	-->
+	<select id="morder-get_order_list">
+		select tb1.*, tb2.vact_num, tb2.vact_nm, tb3.code_nm2 as trans_nm1, tb3.bigo as trans_url1, tb2.cash_yn, tb2.receipt_url
+				, (SELECT otype_nm FROM wt_order_otype WHERE otype_cd= tb1.otype_cd ) otype_nm
+				, (SELECT order_state_nm FROM wt_order_state WHERE use_yn='Y' AND order_state_cd = tb1.order_state_cd) as order_state_nm
+				, (SELECT count(*) FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' ) p_cnt
+				, (SELECT product_nm FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' order by product_ocode asc limit 1 ) product_nm
+				, (SELECT file_nm FROM wt_product_file WHERE product_cd = ( select product_cd from wt_order_product a WHERE a.ocode = tb1.ocode AND a.product_gb = 'N' ORDER BY a.product_ocode LIMIT 1 ) AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS main_img
+				, (SELECT max(reg_date) from wt_order_history where ocode = tb1.ocode and order_state_cd = '40' ) as order_state_date_40
+				, (SELECT count(*) from wt_order_part_cancel where ocode = tb1.ocode) as part_cancel_cnt
+				, (SELECT receipt_url from wt_order_cash_receipts where ocode = tb1.ocode order by reg_date desc limit 1) as cash_receipt_url
+		from wt_order_info tb1 left outer join wt_card tb2
+		on tb1.ocode = tb2.ocode
+		left outer join wt_code2 tb3
+		on tb1.trans_method_cd = tb3.code_cd2
+		where tb1.order_yn = 'Y'
+		and tb1.otype_cd
+		<![CDATA[ <> ]]> '80'
+		and tb1.cust_seq = #{cust_seq}
+		<if test="sh_s_date != null and sh_s_date != '' ">
+			and DATE_FORMAT(tb1.reg_date, '%Y-%m-%d') >= #{sh_s_date}
+		</if>
+		<if test="sh_e_date != null and sh_e_date != '' ">
+			and DATE_FORMAT(tb1.reg_date, '%Y-%m-%d')
+			<![CDATA[ <= ]]> #{sh_e_date}
+		</if>
+		order by tb1.reg_date desc
+	</select>
+	<!--
+	완료 - 결제 마스터 정보 조회
+	TODO - cust_seq 는 넣어놨음
+		if($this->session->userdata('cust_seq')){
+	        $sh_sql = "AND tb1.ocode = '{$this->db->escape_str($ocode)}' AND tb1.cust_seq = ".$this->session->userdata('cust_seq');
+	    } else {
+	    	$or_name = $this->session->userdata('guest_or_name');
+	    	$ocode = $this->session->userdata('guest_or_ocode');
+
+			$sh_sql = "AND tb1.ocode = '{$this->db->escape_str($ocode)}' AND tb1.or_name='{$this->db->escape_str($or_name)}'";
+	    }
+	-->
+	<select id="morder-get_order_info">
+		select tb1.*, tb2.vact_num, tb2.vact_nm, tb2.tid, tb2.cash_yn, tb2.receipt_url
+				, ( SELECT otype_nm FROM wt_order_otype WHERE otype_cd= tb1.otype_cd ) otype_nm
+				, ( SELECT order_state_nm FROM wt_order_state WHERE order_state_cd= tb1.order_state_cd ) order_state_nm
+				, (SELECT count(*) from wt_order_part_cancel where ocode = tb1.ocode) as part_cancel_cnt
+		from wt_order_info tb1 left outer join wt_card tb2
+		on tb1.ocode = tb2.ocode
+		where 1=1
+		<if test="ocode != null and ocode != '' ">
+			AND tb1.ocode = #{ocode}
+		</if>
+		<if test="cust_seq != null and cust_seq != '' ">
+			AND tb1.cust_seq = #{cust_seq}
+		</if>
+	</select>
+	<!--
+	완료 - 결제 상품 정보 조회
+	-->
+	<select id="morder-get_order_product">
+		SELECT tb1.*, tb3.order_state_nm
+				, tb2.product_type
+				, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS main_img
+				, ( SELECT case when refund_gb = '10' then CONCAT('교환',case when state = '10' then ' 접수' when state = '20' then ' 처리중' when state = '30' then ' 완료' END)
+							   when refund_gb = '20' then CONCAT('반품',case when state = '10' then ' 접수' when state = '20' then ' 처리중' when state = '30' then ' 완료' END)
+						   end
+					FROM wt_order_refund WHERE tb1.product_ocode = wt_order_refund.product_ocode AND state IN (10,20,30) LIMIT 1) AS refund_yn_str
+				, ( SELECT count(*) FROM wt_order_refund WHERE tb1.product_ocode = wt_order_refund.product_ocode AND ( (refund_gb = '10' and state in (10,20)) or (refund_gb = '20' and state in (10,20,30))) ) AS review_write_check
+		FROM wt_order_product tb1, wt_product tb2, wt_order_state tb3
+		WHERE tb1.product_cd = tb2.product_cd
+		and tb1.product_order_state_cd = tb3.order_state_cd
+		<if test="ocode != null and ocode != '' ">
+			AND tb1.ocode = #{ocode}
+		</if>
+		<if test="product_ocode != null and product_ocode != '' ">
+			AND tb1.product_ocode = #{product_ocode}
+		</if>
+		ORDER BY tb1.cart_seq desc
+	</select>
+	<!--
+	완료 - 주문상품 옵션 목록
+	-->
+	<select id="morder-get_order_product_option">
+		SELECT tb2.*
+				,(SELECT opt1.opt_nm1 FROM wt_product_opt1 opt1, wt_product_opt2 opt2
+				   WHERE opt1.opt_cd1 = opt2.opt_cd1
+					 AND opt2.opt_cd2 = tb2.opt_cd
+					 AND opt2.product_cd = tb1.product_cd
+					 AND opt1.product_cd = opt2.product_cd) as opt_nm1
+		FROM wt_order_product tb1, wt_order_product_opt tb2
+		WHERE tb1.product_ocode = tb2.product_ocode
+		AND tb1.ocode = #{ocode}
+		AND tb2.product_ocode = #{product_ocode}
+		/* ORDER BY tb2.order_product_opt_seq asc */
+		ORDER BY tb2.opt_cd asc
+	</select>
+	<!--
+	결제상태 업데이트 TODO
+	-->
+	<update id="morder-order_update">
+		UPDATE wt_order_info
+		set
+			order_state_cd = #{order_state_cd},
+			cancel_gb = #{cancel_gb},
+			cancel_txt = #{cancel_txt},
+			vact_cancel_gb = #{vact_cancel_gb}
+		where
+			ocode = #{ocode}
+	</update>
+	<update id="morder-order_update1-1">
+		UPDATE wt_order_info
+		set
+			order_state_cd = #{order_state_cd},
+			cancel_gb = #{cancel_gb},
+			cancel_txt = #{cancel_txt}
+		where
+			ocode = #{ocode}
+	</update>
+	<update id="morder-order_update2">
+		UPDATE wt_order_product
+		SET
+			product_order_state_cd = #{order_state_cd}
+		WHERE
+			ocode = #{ocode}
+	</update>
+	<!--
+	환불취소 카드정보 업데이트 TODO
+	-->
+	<update id="morder-order_card_update">
+		UPDATE wt_card
+		SET
+			vart_refund_bank_cd = #{vart_refund_bank_cd},
+			vact_refund_account = #{vact_refund_account},
+			vart_refund_depositor = #{vart_refund_depositor}
+		WHERE
+			ocode = #{ocode}
+	</update>
+	<!--
+	쿠폰 복구처리
+	-->
+	<update id="morder-order_coupon_update">
+		UPDATE wt_coupon_member
+		SET
+			ocode = null,
+			use_yn = 'N',
+			use_date = null
+		WHERE
+			coupon_member_seq = #{coupon_member_seq}
+	</update>
+	<!--
+	상품 재고복구
+	-->
+	<!--#조합일경우 재고차감-->
+	<update id="morder-order_stock_update">
+		UPDATE wt_product_stock tb1
+				, ( SELECT tb1.product_cd, tb2.opt_qty, tb2.opt_gb, tb1.product_ocode
+							, GROUP_CONCAT(tb2.opt_cd ORDER BY tb2.opt_cd ASC) AS opt_group
+					FROM wt_order_product tb1 , wt_order_product_opt tb2
+					WHERE tb1.product_ocode = tb2.product_ocode
+					AND tb1.ocode=#{ocode}
+					AND tb1.product_gb = 'N'
+					AND tb2.opt_gb = 'C'
+					GROUP BY product_ocode
+				) tb2
+		SET tb1.stock = tb1.stock + tb2.opt_qty
+		WHERE tb1.product_cd = tb2.product_cd
+			AND if(tb1.opt_val1 IS NOT NULL, FIND_IN_SET(tb1.opt_val1, tb2.opt_group) > 0, 1)
+			AND if(tb1.opt_val2 IS NOT NULL, FIND_IN_SET(tb1.opt_val2, tb2.opt_group) > 0, 1)
+			AND if(tb1.opt_val3 IS NOT NULL, FIND_IN_SET(tb1.opt_val3, tb2.opt_group) > 0, 1)
+			AND tb1.opt_gb = 'C'
+			AND tb1.stock > 0
+	</update>
+	<!--#개별옵션&추가옵션 재고차감-->
+	<update id="morder-order_stock_update2">
+		UPDATE wt_product_stock tb1
+						, (	SELECT tb1.product_cd, tb2.opt_cd, tb2.opt_qty
+							FROM wt_order_product tb1, wt_order_product_opt tb2
+							WHERE tb1.product_ocode = tb2.product_ocode
+							AND tb1.ocode=#{ocode}
+							AND tb1.product_gb = 'N'
+							AND tb2.opt_gb IN ('I','S')
+						) tb2
+		SET tb1.stock = tb1.stock + tb2.opt_qty
+		WHERE tb1.product_cd = tb2.product_cd
+			AND tb1.opt_cd2 = tb2.opt_cd
+			AND tb1.opt_gb IN ('I','S')
+			AND tb1.stock > 0
+	</update>
+	<!--#옵션없는 일반상품-->
+	<update id="morder-order_stock_update3">
+		UPDATE wt_product_stock tb1 , wt_order_product tb2
+		SET tb1.stock = tb1.stock + tb2.qty
+		WHERE tb1.product_cd = tb2.product_cd
+			and tb1.opt_cd2 is null
+			and tb1.opt_gb = 'I'
+			AND tb2.ocode=#{ocode}
+			AND tb2.product_gb = 'N'
+			AND tb1.stock > 0
+	</update>
+	<!--
+	장바구니 바로구매 담긴상품 삭제
+	-->
+	<!--#바로구매 담긴상품 삭제-->
+	<delete id="morder-delete_cart_prdouct">
+		DELETE FROM wt_cart
+		WHERE
+			iscurr = 'T'
+			AND use_yn = 'N'
+			AND cust_seq = #{cust_seq}
+	</delete>
+	<!--#주문하기 넘어간 상태 초기화-->
+	<update id="morder-delete_cart_prdouct2">
+		UPDATE wt_cart
+		SET
+			tmp_order_yn = 'N'
+		WHERE
+			cust_seq = #{cust_seq}
+	</update>
+	<!--
+	주문할 상품목록 조회
+	-->
+	<select id="morder-get_order_product_list">
+		select tb1.cust_seq, tb1.user_id, tb2.product_cd, tb2.opt_cd, tb2.qty, tb2.product_ocode
+		from wt_order_info tb1, wt_order_product tb2
+		where tb1.ocode = tb2.ocode
+			and tb1.ocode = #{ocode}
+			and tb2.product_gb = 'N'
+		order by tb2.product_ocode asc
+	</select>
+	<!--
+	주문할 상품옵션목록 조회
+	-->
+	<select id="morder-get_order_product_opt_list">
+		select tb2.opt_cd, tb2.opt_qty, tb2.opt_gb, tb2.w_opt
+		from wt_order_product tb1, wt_order_product_opt tb2
+		where tb1.product_ocode = tb2.product_ocode
+			and tb1.ocode = #{ocode}
+			and tb1.product_ocode = #{product_ocode}
+		ORDER BY opt_cd
+	</select>
+	<!--
+	카트 등록 TODO
+	-->
+	<insert id="morder-cart_product_insert">
+		INSERT into wt_cart(
+			cust_seq,
+			user_id,
+			session_id,
+			product_cd,
+			iscurr,
+			use_yn,
+			opt_cd,
+			tmp_order_yn,
+			qty,
+			path_gb
+		)
+		values(
+			#{cust_seq},
+			#{user_id},
+			#{session_id},
+			#{product_cd},
+			#{iscurr},
+			#{use_yn},
+			#{opt_cd},
+			#{tmp_order_yn},
+			#{qty},
+			#{path_gb}
+		)
+	</insert>
+	<!--
+	카트옵션 등록 TODO
+	-->
+	<insert id="morder-cart_product_opt_insert">
+		INSERT into wt_cart_opt()
+		values()
+	</insert>
+	<!--
+	반품&환불 신청관리 TODO
+	-->
+	<insert id="morder-refund_insert">
+		INSERT INTO wt_order_refund(
+			ocode,
+			product_ocode,
+			state,
+			refund_gb,
+			refund_gb_msg,
+			content,
+			user_nm,
+			reg_date
+		)
+		values(
+			#{ocode},
+			#{product_ocode},
+			#{state},
+			#{refund_gb},
+			#{refund_gb_msg},
+			#{content},
+			#{user_nm},
+			now()
+		)
+	</insert>
+	<!--
+	교환 옵션 등록 TODO
+	-->
+	<insert id="morder-change_opt_insert">
+		INSERT INTO wt_order_refund_opt()
+		values()
+	</insert>
+	<!--
+	주문 히스토리 등록
+	-->
+	<insert id="morder-order_history">
+		insert into wt_order_history(ocode, order_state_cd, reg_date)
+		values(#{ocode}, #{order_state_cd}, now())
+	</insert>
+	<select id="morder-getPrevOrderList">
+		SELECT 
+			reg_date, ocode, product_nm, product_nm_optional, order_price, pay_gb 
+		FROM 
+			wt_order_info_before 
+		WHERE 
+			cust_seq = #{cust_seq}
+		<if test="sh_s_date != null and sh_s_date != '' ">
+				and date_format(reg_date, '%Y-%m-%d') >= #{sh_s_date}
+			</if>
+		<if test="sh_e_date != null and sh_e_date != '' ">
+				and date_format(reg_date, '%Y-%m-%d')
+			<![CDATA[ <= ]]> #{sh_e_date}
+		</if>
+	</select>
+	<!--
+	완료 - 결제 마스터 정보 조회
+	-->
+	<select id="morder-get_order_info_refund">
+		select 
+			tb1.*, (select product_nm from wt_order_product where product_ocode = tb2.product_ocode) as product_nm
+		from 
+			wt_order_info tb1 
+			left outer join wt_order_refund tb2	on tb1.ocode = tb2.ocode
+		where 
+			tb2.refund_seq = #{seq}
+	</select>
+	<!--
+	완료 - SMS 발송
+	-->
+	<select id="morder-get_sms_order_info">
+		select 
+			tb1.*, tb2.vact_num, tb2.vact_nm, tb2.tid
+			, ( SELECT otype_nm FROM wt_order_otype WHERE otype_cd= tb1.otype_cd ) otype_nm
+			, ( SELECT order_state_nm FROM wt_order_state WHERE order_state_cd= tb1.order_state_cd ) order_state_nm
+			, ( SELECT cancel_price FROM wt_order_part_cancel WHERE tb1.ocode = tb2.ocode ORDER BY part_cancel_seq DESC LIMIT 1) AS part_cancel_price
+		from 
+			wt_order_info tb1 
+			left outer join wt_card tb2 on tb1.ocode = tb2.ocode
+		where 1=1
+			AND tb1.ocode = #{ocode}
+	</select>
+	<!--
+	 완료 - 교환반품 환불금액 계산
+	-->
+	<select id="morder-get_refund_trans_price_info">
+		select 
+			tb1.*
+			, ( SELECT ifnull(sum(tb2.total_price - tb2.product_coupon_dc_price),0) 
+				FROM wt_order_product tb2 
+				WHERE tb1.ocode = tb2.ocode and tb2.product_ocode
+		<![CDATA[ <> ]]> #{product_ocode} and product_gb = 'N' ) mod_product_price
+			, ( SELECT ifnull(sum(tb2.total_price - tb2.product_coupon_dc_price),0) 
+				FROM wt_order_product tb2 
+				WHERE tb1.ocode = tb2.ocode and tb2.product_ocode = #{product_ocode} and product_gb = 'N' ) refund_product_price
+		from wt_order_info tb1
+		where 1=1
+			AND tb1.ocode = #{ocode}
+			AND tb1.cust_seq = #{cust_seq}
+			/* 
+			삭제 처리
+			$or_name = $this->session->userdata('guest_or_name');
+	    	$ocode = $this->session->userdata('guest_or_ocode');
+
+			$sh_sql = "AND tb1.ocode = '{$this->db->escape_str($ocode)}' AND tb1.or_name='{$this->db->escape_str($or_name)}'";
+			*/
+	</select>
+	<!-- 사용 하면 안될것 같음 -->
+	<select id="morder-get_pre_order_info">
+		select tb1.*
+				, IFNULL(( SELECT use_review_seq FROM wt_use_review WHERE product_cd = tb1.product_cd AND user_id = tb1.order_id LIMIT 1 ),0) AS review_yn
+		from wt_order_info_prev tb1
+		where 1=1
+			AND tb1.ocode = #{pre_guest_or_ocode} AND tb1.order_nm = #{pre_guest_or_name}
+	</select>
+	<select id="morder-get_pre_order_list">
+		<if test="ocode != null && ocode != ''">
+			SELECT 
+				*
+				, ( SELECT file_nm FROM wt_product_file 
+					WHERE product_cd = wt_order_info_prev.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS main_img
+			 FROM wt_order_info_prev 
+			 WHERE ocode = #{ocode} 
+			 	AND order_id = #{user_id}
+		</if>
+		<if test="ocode == null || ocode == ''">
+			SELECT * 
+			FROM wt_order_info_prev 
+			WHERE 1=1 
+				AND order_id = #{user_id}
+			GROUP BY ocode
+		</if>
+	</select>
+	<update id="morder-cash_state_update">
+		update wt_card
+		set cash_yn = #{cash_yn}
+		where ocode = #{ocode}
+	</update>
+	<select id="morder-get_cash_order_info">
+		select	tb1.ocode, tb1.order_price, tb1.or_hp, tb2.cash_yn
+			, (SELECT count(*) FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' ) p_cnt
+			, (SELECT product_nm FROM  wt_order_product WHERE ocode = tb1.ocode AND product_gb='N' order by product_ocode asc limit 1 ) product_nm
+		from 
+			wt_order_info tb1 
+			left outer join wt_card tb2 on tb1.ocode = tb2.ocode
+		where tb1.ocode = #{ocode}
+	</select>
+	<insert id="morder-get_cash_receipts_insert">
+		insert into wt_order_cash_receipts()
+		values()
+	</insert>
+	<select id="morder-get_cash_receipts_info">
+		select 
+			receipt_key 
+		from 
+			wt_order_cash_receipts tb1 
+		where 
+			ocode = #{ocode}
+			and state = 'W'
+			and NOT EXISTS (select receipt_key from wt_order_cash_receipts tb2 where tb1.ocode = tb2.ocode and state = 'C')
+	</select>
+	<!--
+	/**
+     * 관심상품 count 불러오기
+     * @param  [type] $arrays [description]
+     * @param  [type] $gb     [product : 상품상세, mypage : 마이페이지]
+     * @return [type]         [description]
+     */
+	 -->
+	<select id="wish-get_total">
+		SELECT count(*) as count
+		FROM wt_wishlist tb1
+		WHERE 1=1
+			AND cust_seq = #{cust_seq}
+		<if test="sh_s_date != null and sh_s_date != '' ">
+				and date_format(tb1.reg_date, '%Y-%m-%d') >= #{sh_s_date}
+			</if>
+		<if test="sh_e_date != null and sh_e_date != '' ">
+				and date_format(tb1.reg_date, '%Y-%m-%d')
+			<![CDATA[ <= ]]> #{sh_e_date}
+		</if>
+	</select>
+	<!--
+	/**
+     * 관심상품 불러오기
+     * @param  [type] $arrays    [description]
+     * @param  [type] $row_count [description]
+     * @param  [type] $start_num [description]
+     * @param  [type] $gb        [product : 상품상세, mypage : 마이페이지]
+     * @return [type]            [description]
+     */
+	 -->
+	<select id="wish-get_list">
+		SELECT *
+			, ( select count(*) from wt_use_review where product_cd = tb1.product_cd ) as review_cnt
+			, ( select count(*) from wt_product_opt1 where product_cd = tb1.product_cd and use_yn = 'Y') as option_cnt
+			, ( select opt_cd1 from wt_product_opt1 where product_cd = tb1.product_cd and use_yn = 'Y' limit 1) as opt_cd1
+			, (select code_nm2 from wt_code2 where code_cd1 = '900' and code_cd2 = tb2.brand_cd) as brand_nm
+			, ifnull((select round(avg(POINT),1) from wt_use_review where product_cd = tb2.product_cd),0) as review_avg_point
+			, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+		FROM wt_wishlist tb1
+		INNER JOIN wt_product tb2
+		ON tb2.product_cd = tb1.product_cd
+		AND tb2.del_yn = 'N'
+		WHERE 1=1
+			AND cust_seq = #{cust_seq}
+		<if test="sh_s_date != null and sh_s_date != '' ">
+				and date_format(tb1.reg_date, '%Y-%m-%d') >= #{sh_s_date}
+			</if>
+		<if test="sh_e_date != null and sh_e_date != '' ">
+				and date_format(tb1.reg_date, '%Y-%m-%d')
+			<![CDATA[ <= ]]> #{sh_e_date}
+		</if>
+		ORDER BY tb1.wishlist_seq DESC
+	</select>
+	<!--
+	/**
+     * 관심상품 중복 체크
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	-->
+	<select id="wish-exists_wishlist">
+		SELECT *
+		FROM wt_wishlist tb1
+		WHERE product_cd = #{product_cd}
+		AND cust_seq = #{cust_seq}
+	</select>
+	<!--
+	/**
+     * 관심상품 등록
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	-->
+	<insert id="wish-insert_wishlist">
+		insert into wt_wishlist(cust_seq, product_cd, reg_date) 
+		values(#{cust_seq}, #{product_cd}, now())
+	</insert>
+	<!--
+	/**
+     * 관심상품 삭제
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	-->
+	<delete id="wish-del_wishlist">
+		DELETE FROM wt_wishlist 
+		WHERE cust_seq = #{cust_seq} 
+			AND product_cd in ( ${product_cd}) 
+	</delete>
+	<!-- review -->
+	<select id="review-index_review_list">
+		SELECT content FROM wt_use_review WHERE use_yn='Y' ORDER BY use_review_seq DESC LIMIT 3
+	</select>
+	<select id="review-getProductName">
+		SELECT product_nm FROM wt_product WHERE product_cd = #{product_cd}
+	</select>
+	<!--
+	## 프로모션 게시물 내용 가져오기
+	-->
+	<select id="review-get_review_info">
+		SELECT
+			banner_seq, banner_nm, LEFT(display_Sdate, 10) AS s_date, LEFT(display_Edate, 10) AS e_date,
+			<if test="checkDevice == 'desktop'">
+					content
+			</if>
+			<if test="checkDevice == 'mobile'">
+					content_mobile as content
+			</if>
+		FROM
+			wt_banner
+		WHERE
+		 banner_cd = #{banner_cd} and use_yn = 'Y'
+		and date_format(display_Sdate, '%Y-%m-%d %H:%i')
+		<![CDATA[ <= now() ]]>
+		and date_format(display_Edate, '%Y-%m-%d %H:%i') >= now()
+	</select>
+	<insert id="review-insert">
+		INSERT
+			wt_use_review
+		SET
+			cust_seq	= #{cust_seq},
+			user_id		= #{user_id},
+			user_nm		= #{user_nm},
+			hp			= #{hp},
+			product_cd	= #{product_cd},
+			title		= #{title},
+			content		= #{content},
+			point		= #{point},
+			ocode		= #{ocode},
+			reg_date	= now(),
+			file_nm1	= #{file_nm1},
+			file_nm2	= #{file_nm2},
+			file_nm3	= #{file_nm3},
+			file_nm4	= #{file_nm4},
+			file_nm5	= #{file_nm5},
+			review_gb	= #{review_gb}
+	</insert>
+	<insert id="review-pointInsert">
+		/* $this->db->insert('wt_use_review_point', $insert); */
+		/*
+		'product_cd'	=>	$data['product_cd'],
+		'code_cd2'		=>	$code['code_cd2'],
+		'point'			=>	$data[$code['code_cd2']],			//point 값이.. 배열 형태로 code_cd2 값 명칭으로 들어옴
+		'user_id'		=>	$data['user_id'],
+		'user_nm'		=>  $data['user_nm'],
+		'reg_date'		=>	date("Y-m-d H:i:s"),
+		'use_review_seq'=>  $use_review_seq
+		*/
+		insert into wt_use_review_point(product_cd, code_cd2, point, user_id, user_nm, reg_date, use_review_seq)
+		values(#{product_cd}, #{code_cd2}, #{point}, #{user_id}, #{user_nm}, now(), #{use_review_seq} )
+	</insert>
+	<update id="review-update">
+		update
+			wt_use_review
+		SET
+			title		= #{title},
+			content		= #{content},
+			point		= #{point},
+			reg_date	= now(),
+			file_nm1	= #{file_nm1},
+			file_nm2	= #{file_nm2},
+			file_nm3	= #{file_nm3},
+			file_nm4	= #{file_nm4},
+			file_nm5	= #{file_nm5},
+			review_gb	= #{review_gb}
+		WHERE
+			user_id = #{user_id}
+			and use_review_seq = #{use_review_seq}
+	</update>
+	<select id="review-getView">
+		SELECT * 
+		FROM wt_use_review 
+		WHERE 
+			use_review_seq = #{use_review_seq}
+			AND product_cd = #{product_cd}
+	</select>
+	<select id="review-getMyPoint">
+		SELECT 
+			code_cd2, point, point_seq 
+		FROM wt_use_review_point 
+		WHERE 
+			product_cd = #{product_cd}
+			AND user_id = #{user_id}
+		ORDER BY code_cd2 ASC
+	</select>
+	<delete id="review-deletePoint">
+		DELETE FROM wt_use_review_point 
+		WHERE 
+			product_cd = #{product_cd}
+			AND user_id = #{user_id}
+	</delete>
+	<select id="review-getMyListIndex">
+		SELECT
+			tb1.*, tb2.product_nm AS product_nm
+		FROM
+			wt_use_review tb1, wt_product tb2
+		WHERE
+			user_id = #{user_id}
+			AND tb1.product_cd = tb2.product_cd 
+			AND use_yn = 'Y'
+		ORDER BY
+			use_review_seq DESC
+		LIMIT 1
+	</select>
+	<select id="review-getList">
+		SELECT
+			tb1.use_review_seq, tb1.cust_seq, tb1.user_id, tb1.user_nm, tb1.product_cd, tb1.reg_date, tb1.title, tb1.content, tb1.review_gb, tb1.point,
+			tb1.file_nm1, tb1.file_nm2, tb1.file_nm3, tb1.file_nm4, tb1.file_nm5,
+			tb1.photo_review_url, tb1.photo_review_url2, tb1.photo_review_url3, tb1.photo_review_url4, tb1.photo_review_url5, tb1.photo_review_url6,reserved_yn,
+			(SELECT COUNT(*) FROM wt_use_review_comment WHERE wt_use_review_comment.use_review_seq = tb1.use_review_seq AND use_yn ='Y') as comment_cnt,
+			(SELECT product_nm FROM wt_product WHERE product_cd = tb1.product_cd AND use_yn ='Y') as product_nm
+			,(SELECT COUNT(*) FROM wt_like_info WHERE sort='review' AND ref_seq = tb1.use_review_seq AND gubun ='L' ) AS like_cnt
+			,(SELECT COUNT(*) FROM wt_like_info WHERE sort='review' AND ref_seq = tb1.use_review_seq AND gubun ='L' and cust_seq = #{cust_seq} ) AS like_yn
+		FROM
+			wt_use_review tb1
+			JOIN (
+				SELECT
+					use_review_seq,	product_nm
+				FROM
+					wt_use_review
+				JOIN wt_product tb2	ON tb2.product_cd = wt_use_review.product_cd
+				WHERE
+					wt_use_review.use_yn ='Y'
+		<if test="keyword != null && keyword != ''">
+						AND #{category} LIKE '%${keyword}%' ESCAPE '!'
+					</if>
+		<if test="user_id != null && user_id != ''">
+						AND user_id = #{user_id}
+					</if>
+		<if test="photo != null && photo != ''">
+						AND review_gb ='P'
+					</if>
+				ORDER BY
+		<if test="sorting != null && sorting != ''">
+						${sorting}
+					</if>
+		<if test="sorting == null || sorting == ''">
+						like_cnt DESC
+					</if>
+				LIMIT
+					${start_num}, ${row_count}
+			) AS tmp
+			ON tmp.use_review_seq	=	tb1.use_review_seq
+	</select>
+	<select id="review-getProductList">
+		<if test="group_yn == 'Y'">
+			SELECT
+				wt_use_review.*,
+				(SELECT AVG(POINT) FROM wt_use_review WHERE product_cd IN ( SELECT set_product_cd FROM wt_product_set where product_cd = #{product_cd} ) ) AS point_avg,
+				(SELECT COUNT(*) FROM wt_use_review_comment WHERE wt_use_review_comment.use_review_seq = wt_use_review.use_review_seq) as comment_cnt,
+				( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq ) AS like_cnt,
+				( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq AND cust_seq = #{cust_seq} ) AS like_yn
+			FROM
+				wt_use_review
+			WHERE
+				product_cd IN ( SELECT set_product_cd FROM wt_product_set where product_cd = #{product_cd} )
+				AND use_yn = 'Y'
+			<if test="review_gb != null && review_gb != ''">
+					AND review_gb = #{review_gb}
+				</if>
+			ORDER BY
+				best_yn asc,
+			<choose>
+				<when test="review_sort == 'point_desc'">	point DESC </when>
+				<when test="review_sort == 'point_asc'">	point ASC </when>
+				<when test="review_sort == 'like_cnt'">		like_cnt DESC, use_review_seq DESC </when>
+				<when test="review_sort == 'date_desc'">	use_review_seq DESC </when>
+				<otherwise>	like_cnt DESC, use_review_seq DESC	</otherwise>
+			</choose>
+
+			LIMIT ${start_num}, ${row_count}
+		</if>
+		<if test="group_yn != 'Y'">
+			SELECT
+				wt_use_review.*,
+				(SELECT AVG(POINT) FROM wt_use_review WHERE product_cd = #{product_cd}) AS point_avg,
+				(SELECT COUNT(*) FROM wt_use_review_comment WHERE wt_use_review_comment.use_review_seq = wt_use_review.use_review_seq) as comment_cnt,
+				( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq ) AS like_cnt,
+				( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq AND cust_seq = #{cust_seq} ) AS like_yn
+			FROM
+				wt_use_review
+			WHERE
+				product_cd = #{product_cd} AND use_yn = 'Y'
+			<if test="review_gb != null && review_gb != ''">
+					AND review_gb = #{review_gb}
+				</if>
+			ORDER BY
+				best_yn asc,
+			<choose>
+				<when test="review_sort == 'point_desc'">	point DESC </when>
+				<when test="review_sort == 'point_asc'">	point ASC </when>
+				<when test="review_sort == 'like_cnt'">		like_cnt DESC, use_review_seq DESC </when>
+				<when test="review_sort == 'date_desc'">	use_review_seq DESC </when>
+				<otherwise>	like_cnt DESC, use_review_seq DESC	</otherwise>
+			</choose>
+			LIMIT ${start_num}, ${row_count}
+		</if>
+	</select>
+	<select id="review-checkProduct">
+		SELECT count(*) cnt
+		FROM wt_use_review 
+		WHERE 
+			user_id = #{user_id}
+			AND product_cd = #{product_cd}
+			AND reg_date >= '2022-03-23'
+	</select>
+	<select id="review-purchasedProduct">
+		SELECT 
+			* 
+		FROM 
+			wt_order_product tb1 
+		JOIN 
+			wt_order_info tb2
+		ON 
+			tb1.ocode=tb2.ocode 
+		WHERE 
+			product_order_state_cd = '40' 
+			and user_id = #{user_id}
+			AND product_cd = #{product_cd}
+	</select>
+	<select id="review-chk_ocode">
+		SELECT count(use_review_seq) cnt
+		FROM wt_use_review 
+		WHERE 
+			product_cd = #{product_cd}
+			AND ocode = #{ocode}
+			and user_id= #{user_id}
+	</select>
+	<delete id="review-deleteReview">
+		DELETE FROM wt_use_review 
+		WHERE 
+			user_id = #{user_id}
+			AND use_review_seq = #{use_review_seq}
+	</delete>
+	<select id="review-getPhoto">
+		SELECT file_nm1, file_nm2, file_nm3, file_nm4, file_nm5 
+		FROM wt_use_review 
+		WHERE 
+			use_review_seq = #{use_review_seq}
+	</select>
+	<select id="review-getPoint">
+		SELECT 
+			ROUND((AVG(point) / ${cnt}) * 100,2) AS point 
+		FROM wt_use_review_point 
+		WHERE 
+			product_cd = #{product_cd}
+			AND code_cd2 = #{code_cd2}
+	</select>
+	<select id="review-getDealPoint">
+		SELECT 
+			ROUND((AVG(point) / ${cnt}) * 100,2) AS point 
+		FROM wt_use_review_point 
+		WHERE 
+			product_cd IN ( SELECT set_product_cd FROM wt_product_set WHERE product_cd = #{product_cd} ) 
+			AND code_cd2 = #{code_cd2}
+	</select>
+	<select id="review-getProductavgPoint">
+		SELECT 
+			ROUND(AVG(point),2) as total_avg 
+		FROM 
+			wt_use_review 
+		WHERE 
+			product_cd = #{product_cd}
+	</select>
+	<insert id="review-InsertComment">
+		INSERT
+			wt_use_review_comment
+		SET
+			use_review_seq = #{use_review_seq},
+			cust_seq = #{cust_seq},
+			user_id = #{user_id},
+			user_nm = #{user_nm},
+			comment = #{comment},
+			reg_date = now()
+	</insert>
+	<select id="review-getComment">
+		SELECT 
+			* 
+		FROM wt_use_review_comment 
+		WHERE 
+			use_review_seq = #{use_review_seq}
+			AND use_yn ='Y' 
+	</select>
+	<select id="review-getCode">
+		SELECT 
+			* 
+		FROM 
+			wt_code2 
+		WHERE 
+			code_cd1 = #{code_cd1}
+	</select>
+	<select id="review-getCodeCount">
+		SELECT count(*) cnt
+		FROM 
+			wt_code2 
+		WHERE 
+			code_cd1 = #{code_cd1}
+	</select>
+	<select id="review-getOrderList1">
+		SELECT
+			DISTINCT tb2.product_nm, tb2.qty, tb2.product_cd, tb1.user_id, tb1.cust_seq , tb3.reg_date, tb1.ocode
+		FROM 
+			wt_order_info tb1 
+			JOIN wt_order_product tb2 ON tb1.ocode = tb2.ocode 
+			JOIN wt_order_history tb3 ON tb1.ocode = tb3.ocode
+		WHERE
+			tb1.order_state_cd='40' 
+			AND tb1.cust_seq = #{cust_seq} 
+			AND tb3.order_state_cd='40' 
+			AND tb3.reg_date >= date_add(now(), INTERVAL -65 day)  
+		ORDER BY 
+			reg_date
+		LIMIT 1
+	</select>
+	<select id="review-getOrderList2">
+		SELECT 
+			* 
+		FROM 
+			wt_use_review 
+		WHERE 
+			cust_seq = #{cust_seq}
+	</select>
+	<select id="review-getProductImg">
+		SELECT 
+			main_img 
+		FROM 
+			wt_product 
+		WHERE 
+			product_cd = #{product_cd}
+	</select>
+	<!--
+	## 댓글 신고 여부 확인
+	-->
+	<select id="review-chk_report">
+		SELECT 
+			COUNT(*) as cnt 
+		FROM 
+			wt_like_info 
+		WHERE 
+			ref_seq = #{ref_seq} 
+			AND sort = #{sort} 
+			AND gubun = 'R' 
+			AND cust_seq = #{cust_seq}
+	</select>
+	<!--
+	## 댓글 신고하기
+	-->
+	<insert id="review-report_comment">
+		/* $this->db->insert('wt_like_info', $arrays); */
+	</insert>
+	<!--
+	## 댓글 좋아요처리
+	-->
+	<insert id="review-like_review">
+		/* $this->db->insert('wt_like_info', $arrays); */
+	</insert>
+	<!--
+	## 좋아요 취소처리
+	-->
+	<delete id="review-cencel_like_review">
+		DELETE FROM wt_like_info 
+		WHERE 
+			cust_seq = #{cust_seq} 
+			AND gubun = 'L' 
+			AND sort = #{sort} 
+			AND ref_seq = #{ref_seq}
+	</delete>
+	<!--
+	## 댓글 삭제 -> use_yn 만 N 값으로 변경
+	-->
+	<update id="review-del_comment">
+		UPDATE wt_use_review_comment 
+		SET 
+			use_yn ='N' 
+		WHERE 
+			comment_seq = #{comment_seq} 
+			AND cust_seq = #{cust_seq}
+	</update>
+	<!--
+	## 상품 존재 여부
+	-->
+	<select id="review-ExistProduct">
+		SELECT 
+			count(*) cnt
+		FROM 
+			wt_product 
+		WHERE 
+			product_cd = #{product_cd}
+	</select>
+	<select id="check_product">
+		SELECT * FROM wt_use_review WHERE user_id = #{user_id} AND product_cd = #{product_cd}
+	</select>
+	<select id="get_code">
+		SELECT * FROM wt_code2 WHERE code_cd1 = #{code_cd1}
+	</select>
+	<select id="get_point">
+		SELECT ROUND((AVG(point) / #{count}) * 100,2) AS point FROM wt_use_review_point WHERE product_cd = #{product_cd} AND code_cd2 = #{code_cd2}
+	</select>
+	<select id="get_product_avg_point">
+		SELECT ROUND(AVG(point),2) as total_avg FROM wt_use_review WHERE product_cd = #{product_cd}
+	</select>
+	<select id="get_product_list">
+		<if test="group_yn == 'Y'">
+			SELECT
+				wt_use_review.*,
+				(SELECT AVG(POINT) FROM wt_use_review WHERE product_cd IN ( SELECT set_product_cd FROM wt_product_set where product_cd = #{product_cd} ) ) AS point_avg,
+				(SELECT COUNT(*) FROM wt_use_review_comment WHERE wt_use_review_comment.use_review_seq = wt_use_review.use_review_seq) as comment_cnt,
+				( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq ) AS like_cnt,
+				( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq AND cust_seq = #{cust_seq} ) AS like_yn
+			FROM
+				wt_use_review
+			WHERE
+				product_cd IN ( SELECT set_product_cd FROM wt_product_set where product_cd = #{product_cd} )
+				AND use_yn = 'Y' ${review_gb}
+			ORDER BY
+				best_yn asc, #{sort}
+			LIMIT #{start_num}, #{row_count}
+		</if>
+		<if test="group_yn == 'N'">
+			SELECT
+				wt_use_review.*,
+				(SELECT AVG(POINT) FROM wt_use_review WHERE product_cd = #{product_cd}) AS point_avg,
+				(SELECT COUNT(*) FROM wt_use_review_comment WHERE wt_use_review_comment.use_review_seq = wt_use_review.use_review_seq) as comment_cnt,
+				( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq ) AS like_cnt,
+				( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq AND cust_seq = #{cust_seq} ) AS like_yn
+			FROM
+				wt_use_review
+			WHERE
+				product_cd = #{product_cd} AND use_yn = 'Y' ${review_gb}
+			ORDER BY
+				best_yn asc, ${sort}
+			LIMIT <![CDATA[${start_num}]]>, <![CDATA[${row_count}]]>
+		</if>
+	</select>
+	<select id="get_comment">
+		SELECT * FROM wt_use_review_comment WHERE use_review_seq = #{use_review_seq} AND use_yn ='Y'
+	</select>
+
+	<select id="get_review_comment">
+               SELECT
+                                       tb1.use_review_seq, tb1.cust_seq, tb1.user_id, tb1.user_nm, tb1.product_cd, tb1.reg_date, tb1.title, tb1.content, tb1.review_gb, tb1.point,
+                                     tb1.file_nm1, tb1.file_nm2, tb1.file_nm3, tb1.file_nm4, tb1.file_nm5,
+                                      tb1.photo_review_url, tb1.photo_review_url2, tb1.photo_review_url3, tb1.photo_review_url4, tb1.photo_review_url5, tb1.photo_review_url6,reserved_yn,
+                                       (SELECT COUNT(*) FROM wt_use_review_comment WHERE wt_use_review_comment.use_review_seq = tb1.use_review_seq AND use_yn ='Y') as comment_cnt,
+                                       (SELECT product_nm FROM wt_product WHERE product_cd = tb1.product_cd AND use_yn ='Y') as product_nm
+                                       ,(SELECT COUNT(*) FROM wt_like_info WHERE sort='review' AND ref_seq = tb1.use_review_seq AND gubun ='L' ) AS like_cnt
+                                       ,(SELECT COUNT(*) FROM wt_like_info WHERE sort='review' AND ref_seq = tb1.use_review_seq AND gubun ='L' and cust_seq = #{cust_seq} ) AS like_yn
+                              FROM
+                                       wt_use_review tb1
+                                      JOIN (
+                                              SELECT
+                                                       use_review_seq,
+                                                       product_nm
+                                               FROM
+                                                      wt_use_review
+                                               JOIN
+                                                      wt_product tb2
+                                               ON
+                                                      tb2.product_cd = wt_use_review.product_cd
+                                              WHERE
+                                                       wt_use_review.use_yn ='Y'
+                                            <if test="user_id">
+												AND user_id = #{user_id}
+											</if>
+											<if test="keyword">
+												AND #{category} LIKE '% "#{keyword}%"' ESCAPE '!' "
+											</if>
+											<if test="review_gb">
+												${review_gb}
+											</if>
+                                               ORDER BY
+                                                      ${sort}
+                                              LIMIT <![CDATA[${start_num}]]>, <![CDATA[${row_count}]]>
+                                      ) AS tmp
+                                      ON tmp.use_review_seq   =       tb1.use_review_seq
+      </select>
+</mapper>

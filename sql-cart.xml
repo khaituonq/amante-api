@@ -1,0 +1,838 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cart">
+
+
+
+
+
+
+	<!--장바구니 -->
+	<select id="get_total">
+		SELECT count(*) as count
+		FROM 
+			wt_cart tb1, wt_product tb2
+		WHERE tb1.product_cd = tb2.product_cd
+			AND tb1.use_yn = 'N'
+			AND tb1.iscurr = 'F'
+			AND tb2.product_state = '2'
+			AND tb2.del_yn = 'N'
+			AND tb1.qty >= 1
+			/*AND tb1.reg_date BETWEEN  DATE_ADD(NOW(),INTERVAL -1 WEEK ) and  NOW() */
+			AND tb1.cust_seq = #{cust_seq}
+	</select>
+
+	<select id="get_list">
+		SELECT tb1.*
+				, tb2.product_nm , tb2.product_type , tb2.supply_price, tb2.product_type
+				, tb2.main_img, tb2.sale_price, tb2.free_trans_yn, tb2.reserve_rate
+				, (SELECT code_nm2 FROM wt_code2 WHERE code_cd1 = '900' AND code_cd2 = tb2.brand_cd) AS brand_nm
+				, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+				, ( SELECT order_limit_cnt FROM wt_product WHERE product_cd = tb2.product_cd ) AS order_limit_cnt
+				, IFNULL(  (SELECT SUM(stb2.qty) FROM wt_order_info stb1 JOIN wt_order_product stb2 ON stb1.ocode = stb2.ocode WHERE stb1.order_yn ='Y' AND stb1.cust_seq=tb1.cust_seq AND tb1.product_cd = stb2.product_cd  AND stb1.order_state_cd IN ('20','30','35','40') ), 0 ) AS order_qty
+		FROM wt_cart AS tb1
+		INNER JOIN wt_product tb2 ON tb2.product_cd = tb1.product_cd
+		WHERE 1=1
+		AND tb1.use_yn = 'N'
+		AND tb1.iscurr = 'F'
+		AND tb2.product_state = '2'
+		AND tb2.del_yn = 'N'
+		AND tb1.qty >= 1
+		AND tb1.cust_seq = #{cust_seq}
+		ORDER BY tb1.cart_seq,tb1.product_cd, tb1.opt_cd
+		LIMIT 100
+	</select>
+	<select id="get_list_1">
+		SELECT tb1.product_cd
+		,tb3.product_nm
+		,tb3.sale_price
+		,(SELECT	 tb2.bigo	FROM	wt_trans_info tb1	JOIN	wt_code2 tb2	ON	tb2.code_cd2=tb1.const_trans_cd	WHERE const_trans_cd = tb2.free_trans_yn) As trans_bigo
+		,tb2.free_trans_yn
+		, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+
+		FROM wt_cart AS tb1
+		INNER JOIN wt_product tb2 ON tb2.product_cd = tb1.product_cd
+		LEFT JOIN wt_product as tb3 ON tb1.product_cd = tb3.product_cd
+		WHERE 1=1
+		AND tb1.use_yn = 'N'
+		AND tb1.iscurr = 'F'
+		AND tb2.product_state = '2'
+		AND tb2.del_yn = 'N'
+		AND tb1.qty >= 1
+		AND tb1.cust_seq = #{cust_seq}
+		GROUP BY product_cd
+	</select>
+	<select id="get_list_cart_by_product">
+		SELECT tb1.*
+				, tb2.product_nm , tb2.product_type , tb2.supply_price, tb2.product_type
+				, tb2.main_img, tb2.sale_price, tb2.free_trans_yn, tb2.reserve_rate
+				, (SELECT code_nm2 FROM wt_code2 WHERE code_cd1 = '900' AND code_cd2 = tb2.brand_cd) AS brand_nm
+				, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+				, ( SELECT order_limit_cnt FROM wt_product WHERE product_cd = tb2.product_cd ) AS order_limit_cnt
+				, IFNULL(  (SELECT SUM(stb2.qty) FROM wt_order_info stb1 JOIN wt_order_product stb2 ON stb1.ocode = stb2.ocode WHERE stb1.order_yn ='Y' AND stb1.cust_seq=tb1.cust_seq AND tb1.product_cd = stb2.product_cd  AND stb1.order_state_cd IN ('20','30','35','40') ), 0 ) AS order_qty
+		FROM wt_cart AS tb1
+		INNER JOIN wt_product tb2 ON tb2.product_cd = tb1.product_cd
+		WHERE 1=1
+		AND tb1.use_yn = 'N'
+		AND tb1.iscurr = 'F'
+		AND tb2.product_state = '2'
+		AND tb2.del_yn = 'N'
+		AND tb1.qty >= 1
+		AND tb1.cust_seq = #{cust_seq}
+		AND tb1.product_cd = #{product_cd}
+		ORDER BY tb1.cart_seq,tb1.product_cd, tb1.opt_cd
+		LIMIT 100
+	</select>
+
+
+	
+	<select id="get_cart_option_list">
+		SELECT
+			opt1.opt_cd1,
+			opt1.opt_nm1,
+			opt1.product_cd,
+			opt2.opt_cd2,
+			opt2.opt_nm2,
+			opt2.opt_price,
+			( SELECT qty FROM wt_cart_opt WHERE opt_gb = #{opt_gb} AND cart_seq = #{cart_seq} AND opt_cd = opt2.opt_cd2 LIMIT 1) AS qty,
+			( SELECT w_opt FROM wt_cart_opt WHERE opt_gb = #{opt_gb} AND cart_seq = #{cart_seq} AND opt_cd = opt2.opt_cd2 LIMIT 1) AS w_opt,
+			( SELECT cart_opt_seq FROM wt_cart_opt WHERE opt_gb = #{opt_gb} AND cart_seq = #{cart_seq} AND opt_cd = opt2.opt_cd2 LIMIT 1) AS cart_opt_seq,
+			( SELECT stock_opt_price FROM wt_product_stock WHERE opt_gb = #{opt_gb} AND product_cd = #{product_cd}  ${sh_sql} LIMIT 1 ) as stock_opt_price
+		 FROM wt_product_opt2 as opt2
+		 INNER JOIN wt_product_opt1 as opt1
+			ON opt1.product_cd = opt2.product_cd AND opt1.opt_cd1 = opt2.opt_cd1
+		 WHERE opt1.product_cd = #{product_cd}
+		 AND opt2.opt_cd2 IN ( SELECT opt_cd FROM wt_cart_opt WHERE opt_gb = #{opt_gb} AND cart_seq = #{cart_seq})
+		 ORDER BY opt2.opt_cd2
+	</select>
+
+
+
+
+
+	<!--두개의 테이블 조합해야 함-->
+	<select id="cartInfo">
+		SELECT
+			*
+		FROM
+			wt_cart
+		WHERE
+			1=1
+			AND cart_seq = #{cart_seq}
+	</select>
+	<select id="get_combine_option_price">
+		SELECT
+			*
+		FROM
+			wt_cart_opt copt
+		WHERE
+			1=1
+			AND cart_seq = #{cart_seq}
+			AND opt_gb = 'C'
+		ORDER BY opt_cd ASC
+	</select>
+
+	<select id="cartCombineOpt">
+		SELECT
+			stock_opt_price
+		 FROM wt_product_stock
+		 WHERE 
+			opt_gb = 'C'
+			AND product_cd = #{product_cd}
+			${addSql}
+		 LIMIT 1
+	</select>
+
+
+
+
+	<!--
+     * 기존에 동일한 옵션이 담겨있는지 장바구니 확인
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+	 -->
+	<select id="get_c_option_list">
+		SELECT 
+			opt1.opt_cd1, opt1.opt_nm1, opt1.product_cd, opt2.opt_cd2, opt2.opt_nm2, opt2.opt_price
+		FROM 
+			wt_product_opt2 as opt2
+			INNER JOIN wt_product_opt1 as opt1 ON opt1.product_cd = opt2.product_cd AND opt1.opt_cd1 = opt2.opt_cd1
+		WHERE 
+			opt1.product_cd = #{product_cd}
+			AND opt2.opt_cd2 IN ( SELECT opt_cd FROM wt_cart_opt WHERE opt_gb = 'C' AND cart_seq = #{$cart_seq})
+		ORDER BY opt2.od
+	</select>
+
+
+	<!--
+     * 기존에 동일한 옵션이 담겨있는지 장바구니 확인
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+	 -->
+	<select id="get_i_option_list">
+		SELECT 
+			opt1.opt_cd1, opt1.opt_nm1, opt1.product_cd, opt2.opt_cd2, opt2.opt_nm2, opt2.opt_price
+		FROM 
+			wt_cart_opt as opt
+			LEFT JOIN wt_cart cart on cart.cart_seq = opt.cart_seq
+			LEFT JOIN wt_product_opt1 as opt1 ON opt1.product_cd = opt2.product_cd AND opt1.opt_cd1 = opt2.opt_cd1
+			LEFT JOIN wt_product_opt2 as opt2 ON opt2.product_cd = cart.product_cd AND opt2.opt_cd2 = opt.opt_cd
+		WHERE 
+			cart.cart_seq = #{cart_seq}
+			AND opt1.use_yn='Y' and opt1.del_yn='N' and opt1.opt_gb='I'
+			AND opt2.use_yn='Y' and opt2.del_yn='N'
+		ORDER BY opt2.od ASC
+	</select>
+
+
+
+	<select id="exists_cart">
+		SELECT
+			*
+		FROM
+			wt_cart
+		WHERE
+			product_cd = #{product_cd}
+			<if test="opt_cd != null and opt_cd != ''">
+			AND opt_cd = #{opt_cd}
+			</if>
+
+			AND tmp_order_yn = #{tmp_order_yn}
+			AND use_yn = 'N'
+			<if test="user_id != null and user_id != ''">
+				AND user_id = #{user_id}
+			</if>
+			<if test="cust_seq != null and cust_seq != ''">
+				AND cust_seq = #{cust_seq}
+			</if>
+			<if test="cust_seq == null">
+				AND session_id = #{session_id}
+			</if>
+	</select>
+
+
+	<!--/* #{session_id},  삭제*/-->
+	<insert id="insert_cart">
+		INSERT INTO wt_cart(
+				cust_seq, 
+				user_id, 
+				product_cd, 
+				iscurr, 
+				qty, 
+				tmp_order_yn, 
+				opt_cd, 
+				path_gb, 
+				session_id,
+				reg_date
+			)
+			values (
+				#{cust_seq},
+				#{user_id}, 
+				#{product_cd}, 
+				#{iscurr}, 
+				#{qty}, 
+				#{tmp_order_yn}, 
+				#{opt_cd}, 
+				#{path_gb}, 
+				#{session_id},
+				now()
+			)
+	</insert>
+	<insert id="insert_cart2">
+		INSERT INTO wt_cart_opt(
+				cart_seq, opt_cd, opt_gb, qty, w_opt
+			)
+			values (
+				#{cart_seq},
+				#{opt_cd}, 
+				#{opt_gb}, 
+				#{qty}, 
+				#{w_opt}
+			)
+	</insert>
+
+
+	<update id="update_cart">
+		UPDATE wt_cart
+			set 
+				qty = qty+(${qty})
+		WHERE
+			cart_seq = #{cart_seq}
+	</update>
+	
+	<update id="update_cartOpt">
+		UPDATE wt_cart_opt
+			set
+				qty = qty+(${qty})
+		WHERE
+			cart_seq = #{cart_seq}
+	</update>
+	
+	<update id="update_cartOpt2">
+		UPDATE wt_cart_opt
+			set 
+				qty = qty+(${qty})
+		WHERE
+			cart_seq = #{cart_seq}
+			AND opt_cd = #{opt_cd}
+	</update>
+	
+	<update id="upd_cart_qty">
+		UPDATE wt_cart
+			set 
+				qty = ${qty}
+		WHERE
+			cart_seq = #{cart_seq}
+	</update>
+
+
+	<!--
+	/**
+     * 장바구니 옵션 INSERT
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	-->
+	<insert id="insert_cart_opt">
+		INSERT INTO wt_cart_opt ( cart_seq, opt_cd, opt_gb, qty, w_opt )
+		VALUES (#{cart_seq}, #{opt_cd}, #{opt_gb}, #{qty}, #{w_opt})
+	</insert>
+	
+	<update id="upd_cart_opt_qty">
+		UPDATE wt_cart_opt
+			set qty = ${qty}
+		WHERE
+			cart_opt_seq = #{cart_opt_seq}
+	</update>
+
+
+	<delete id="del_cart">
+		DELETE FROM wt_cart
+		WHERE cart_seq = #{cart_seq}
+	</delete>
+	
+	<delete id="del_cartOpt">
+		DELETE FROM wt_cart_opt
+		WHERE cart_seq = #{cart_seq}
+	</delete>
+
+	<delete id="del_cart2">
+		DELETE FROM wt_cart
+		WHERE cust_seq = #{cust_seq}
+			AND product_cd = #{product_cd}
+	</delete>
+	
+	<delete id="del_cart2Opt">
+		DELETE FROM wt_cart_opt
+		WHERE cart_seq = #{cart_seq}
+	</delete>
+
+	<!--
+	 /**
+     * 바로구매 항목 지우기
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	 -->
+	<delete id="direct_cart_del">
+		DELETE FROM wt_cart WHERE use_yn = 'N' and iscurr = 'T'
+		<if test="cust_seq != null">
+			AND cust_seq = #{cust_seq}
+		</if>
+		<if test="cust_seq == null">
+			AND session_id = #{session_id}
+		</if>
+	</delete>
+	<update id="direct_cart_delStatus">
+		UPDATE wt_cart SET tmp_order_yn = 'N' WHERE use_yn = 'N' AND iscurr = 'F'
+		<if test="cust_seq != null">
+			AND cust_seq = #{cust_seq}
+		</if>
+		<if test="cust_seq == null">
+			AND session_id = #{session_id}
+		</if>
+	</update>
+
+
+	
+	<delete id="del_cart_opt">
+		DELETE FROM wt_cart_opt
+		WHERE cart_seq in ( #{cart_seq} )
+	</delete>
+
+	<!--
+	 /**
+     * 카트 전체상품 재고체크
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	 -->
+	<select id="cart_stock_check">
+		
+		SELECT DISTINCT *
+		FROM (
+				/* 조합옵션 부족한재고 현황 */
+				SELECT tb2.cart_seq, tb1.stock, tb1.limit_cnt, tb1.product_cd
+						, (SELECT product_nm FROM wt_product WHERE product_cd = tb1.product_cd) AS product_nm
+						, CONCAT_WS('/', tb3.opt_nm2, tb4.opt_nm2, tb5.opt_nm2) AS opt_nm2
+				FROM wt_product_stock tb1
+				JOIN
+				(
+					SELECT tb1.product_cd, tb2.qty, tb2.opt_gb, tb1.cart_seq
+							, GROUP_CONCAT(tb2.opt_cd ORDER BY tb2.opt_cd ASC) AS opt_group
+					FROM wt_cart tb1 , wt_cart_opt tb2
+					WHERE tb1.cart_seq = tb2.cart_seq
+					AND tb2.opt_gb = 'C'
+					AND tb1.cart_seq IN ( #{cart_seq} )
+					<if test="cust_seq != null and cust_seq != ''">
+					AND tb1.cust_seq = #{cust_seq}
+					</if>
+					
+					<if test="session_id != null and session_id != ''">
+					AND tb1.session_id = #{session_id}
+					</if>
+					
+					GROUP BY cart_seq
+				) tb2
+				ON tb1.product_cd = tb2.product_cd
+				LEFT OUTER JOIN wt_product_opt2 tb3 ON tb1.opt_val1 = tb3.opt_cd2 AND tb1.product_cd = tb3.product_cd
+				LEFT OUTER JOIN wt_product_opt2 tb4 ON tb1.opt_val2 = tb4.opt_cd2 AND tb1.product_cd = tb4.product_cd
+				LEFT OUTER JOIN wt_product_opt2 tb5 ON tb1.opt_val3 = tb5.opt_cd2 AND tb1.product_cd = tb5.product_cd
+				WHERE if(tb1.opt_val1 IS NOT NULL, FIND_IN_SET(tb1.opt_val1, tb2.opt_group) > 0, 1)
+				AND if(tb1.opt_val2 IS NOT NULL, FIND_IN_SET(tb1.opt_val2, tb2.opt_group) > 0, 1)
+				AND if(tb1.opt_val3 IS NOT NULL, FIND_IN_SET(tb1.opt_val3, tb2.opt_group) > 0, 1)
+				AND tb1.opt_gb = 'C'
+				AND (((tb1.stock <![CDATA[ <= ]]> tb1.limit_cnt OR tb2.qty > (tb1.stock-tb1.limit_cnt)) AND tb1.stock > 0) OR  tb1.soldout_yn = 'Y')
+				UNION ALL
+				/* 개별&추가옵션 */
+				SELECT tb2.cart_seq, tb1.stock, tb1.limit_cnt, tb1.product_cd
+						,(SELECT product_nm FROM wt_product WHERE product_cd = tb1.product_cd) AS product_nm
+						, tb3.opt_nm2 AS opt_nm
+				FROM wt_product_stock tb1
+				JOIN
+				(
+					SELECT tb1.product_cd, tb2.qty, tb2.opt_gb, tb1.cart_seq, tb2.opt_cd
+					FROM wt_cart tb1, wt_cart_opt tb2
+					WHERE tb1.cart_seq = tb2.cart_seq
+					AND tb2.opt_gb IN ('I','S')
+					AND tb1.cart_seq IN (  #{cart_seq} )
+					
+					<if test="cust_seq != null and cust_seq != ''">
+					AND tb1.cust_seq = #{cust_seq}
+					</if>
+					
+					<if test="session_id != null and session_id != ''">
+					AND tb1.session_id = #{session_id}
+					</if>
+					
+				) tb2
+				ON tb1.product_cd = tb2.product_cd
+				LEFT OUTER JOIN wt_product_opt2 tb3 ON tb1.opt_cd2 = tb3.opt_cd2 AND tb1.product_cd = tb3.product_cd
+				WHERE tb1.opt_cd2 = tb2.opt_cd
+				AND tb1.opt_gb IN ('I','S')
+				AND (((tb1.stock <![CDATA[ <= ]]> tb1.limit_cnt OR tb2.qty > (tb1.stock-tb1.limit_cnt)) AND tb1.stock > 0) OR tb1.soldout_yn = 'Y')
+				UNION ALL
+				/* 옵션없는 일반상품 */
+				SELECT tb1.cart_seq, tb2.stock, tb2.limit_cnt, tb2.product_cd
+						 ,(SELECT product_nm FROM wt_product WHERE product_cd = tb1.product_cd) AS product_nm
+						 ,'' AS opt_nm2
+				FROM wt_cart tb1, wt_product_stock tb2
+				WHERE tb1.product_cd = tb2.product_cd
+				
+				<if test="cust_seq != null and cust_seq != ''">
+				AND tb1.cust_seq = #{cust_seq}
+				</if>
+				
+				<if test="session_id != null and session_id != ''">
+				AND tb1.session_id = #{session_id}
+				</if>
+				
+				AND tb1.cart_seq in (  #{cart_seq} )
+				AND tb2.opt_gb = 'I'
+				AND tb2.opt_cd2 is null
+				AND (((tb2.stock <![CDATA[ <= ]]> tb2.limit_cnt OR tb1.qty > (tb2.stock-tb2.limit_cnt)) AND tb2.stock > 0) OR tb2.soldout_yn = 'Y')
+		) tb1
+	</select>
+
+
+	<!--
+	/**
+     * 상품 개별 재고체크
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	 -->
+	<select id="product_stock_check">
+		SELECT DISTINCT *
+		FROM (
+				SELECT tb1.product_cd, tb2.stock, tb2.limit_cnt, product_nm
+						 ,'' AS opt_nm2
+				FROM wt_product tb1, wt_product_stock tb2
+				WHERE tb1.product_cd = tb2.product_cd
+					/*AND (tb2.opt_cd2 = '' OR tb2.opt_cd2 IS NULL )*/
+					<if test="opt_cd !=null and opt_cd !=''">
+						AND tb2.opt_cd2 in (${opt_cd})
+					</if>
+					<if test="opt_val1 !=null and opt_val1 !=''">
+						AND tb2.opt_val1 in (${opt_val1})
+					</if>
+					<if test="opt_val2 !=null and opt_val2 !=''">
+						AND tb2.opt_val2 in (${opt_val2})
+					</if>
+					<if test="opt_val3 !=null and opt_val3 !=''">
+						AND tb2.opt_val3 in (${opt_val3})
+					</if>
+
+					AND (tb2.stock <![CDATA[ <= ]]> tb2.limit_cnt OR ${qty} > (tb2.stock-tb2.limit_cnt))
+					AND tb2.stock > 0
+					AND tb1.product_cd = #{product_cd}
+				UNION all
+				SELECT tb1.product_cd, tb2.stock, tb2.limit_cnt, product_nm
+						,(SELECT opt_nm2 FROM wt_product_opt2 WHERE opt_cd2 = tb2.opt_cd2 AND product_cd = tb1.product_cd ) AS opt_nm2
+				FROM wt_product tb1, wt_product_stock tb2
+				WHERE tb1.product_cd = tb2.product_cd
+					<if test="opt_cd !=null and opt_cd !=''">
+						AND tb2.opt_cd2 in (${opt_cd})
+					</if>
+					<if test="opt_val1 !=null and opt_val1 !=''">
+						AND tb2.opt_val1 in (${opt_val1})
+					</if>
+					<if test="opt_val2 !=null and opt_val2 !=''">
+						AND tb2.opt_val2 in (${opt_val2})
+					</if>
+					<if test="opt_val3 !=null and opt_val3 !=''">
+						AND tb2.opt_val3 in (${opt_val3})
+					</if>
+					AND (tb2.stock <![CDATA[ <= ]]> tb2.limit_cnt OR ${qty} > (tb2.stock-tb2.limit_cnt))
+					AND tb2.stock > 0
+					AND tb1.product_cd = #{product_cd}
+			) tb1
+	</select>
+
+
+	<select id="get_product_stock">
+		SELECT *
+			, ( SELECT product_nm FROM wt_product WHERE product_cd = tb1.product_cd ) AS stock_product_nm
+			, ( SELECT opt_nm2 FROM wt_product_opt2 WHERE product_cd = tb1.product_cd AND opt_cd2 = tb1.opt_val1 ) AS opt_nm2_1
+			, ( SELECT opt_nm2 FROM wt_product_opt2 WHERE product_cd = tb1.product_cd AND opt_cd2 = tb1.opt_val2 ) AS opt_nm2_2
+			, ( SELECT opt_nm2 FROM wt_product_opt2 WHERE product_cd = tb1.product_cd AND opt_cd2 = tb1.opt_val3 ) AS opt_nm2_3
+			, ( SELECT opt_nm2 FROM wt_product_opt2 WHERE product_cd = tb1.product_cd AND opt_cd2 = tb1.opt_cd2 ) AS opt_nm2_4
+		 FROM wt_product_stock tb1 WHERE stock_seq = ${stock_seq}
+	</select>
+
+
+
+
+	<!--
+	/**
+     * 최근 1주일간 해외배송 제품 주문건이 있는지 확인
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	 -->
+	<select id="national_shipping_check">
+		SELECT *
+			, SUM(order_price) AS total_order_price
+		FROM wt_order_info
+		WHERE order_yn = 'Y'
+			AND unipass_num IS NOT NULL
+			AND order_state_cd IN (20,30,35)
+			AND  DATE_ADD(NOW(), INTERVAL -1 WEEK) <![CDATA[ <= ]]> reg_date
+			<if test="cust_seq != null and cust_seq != ''">
+			AND cust_seq = #{cust_seq}
+			</if>
+			<!--
+			<if test="session_id != null and session_id != ''">
+			AND session_id = #{session_id}
+			</if>
+			-->
+		GROUP BY cust_seq
+	</select>
+
+	<!--
+	/**
+     * 주문하기 상태변경
+     * @param  [type] $data [description]
+     * @return [type]       [description]
+     */
+	-->
+	<update id="upd_cart_tmp">
+		UPDATE wt_cart 
+		SET tmp_order_yn = 'N' 
+		WHERE use_yn = 'N'
+			<if test="cust_seq != null and cust_seq != ''">
+			AND cust_seq = #{cust_seq}
+			</if>
+			<if test="session_id != null and session_id != ''">
+			AND session_id = #{session_id}
+			</if>
+	</update>
+	<update id="upd_cart_tmp2">
+		UPDATE wt_cart 
+		SET tmp_order_yn = 'Y' 
+		WHERE iscurr = 'F' and use_yn = 'N' and cart_seq in ( ${cart_seq} )
+			<if test="cust_seq != null and cust_seq != ''">
+			AND cust_seq = #{cust_seq}
+			</if>
+	</update>
+
+	<!--
+	wt_cart_print 테이블이 없음
+	-->
+	<insert id="storePrintCartUser">
+		INSERT into wt_cart_print(cust_seq, user_nm, phone, email, product_info, reg_date)
+		values(#{cust_seq}, #{user_nm}, #{phone}, #{email}, #{product_info}, now())
+	</insert>
+
+
+
+	<select id="getPrintApplyData">
+		SELECT user_nm, email, phone FROM wt_member WHERE cust_seq = #{cust_seq}
+	</select>
+
+
+	<!--
+	/**
+     * 장바구니 옵션 가져오기
+     *
+     * @param  [type] $cart_seq [description]
+     *
+     * @return [type]           [description]
+     */
+	-->
+	<select id="get_option_list">
+		SELECT *
+		FROM wt_cart_opt tb1
+			INNER JOIN wt_product_opt2 tb2 ON tb2.opt_cd2 = tb1.opt_cd
+		WHERE cart_seq = #{cart_seq}
+			AND product_cd = (select product_cd from wt_cart where cart_seq = #{cart_seq} )
+			AND use_yn ='Y'
+		ORDER BY cart_opt_seq asc
+	</select>
+
+	<!--
+	장바구니 페이지 그룹상품 가져오기 ( wt_group_product 4000번대 코드 사용)
+	-->
+	<select id="get_group_product">
+		SELECT tb1.sale_price AS display_sale_price
+			, (SELECT group_nm FROM wt_group WHERE tb1.group_cd = group_cd ) AS group_nm
+			, tb1.*, tb2.sale_price, tb2.fee_rate, tb2.supply_price
+			, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS main_img
+			,(SELECT COUNT(opt_cd1) FROM wt_product_opt1 WHERE product_cd = tb2.product_cd ) AS opt_cnt
+			,(SELECT od FROM wt_group WHERE tb1.group_cd = group_cd ) AS od
+			FROM wt_group_product tb1, wt_product tb2, wt_group tb3
+			WHERE tb1.product_cd = tb2.product_cd AND tb3.group_cd = tb1.group_cd
+			AND tb1.group_cd > '4000' AND tb1.group_cd < '4999' 
+			AND tb3.use_yn ='Y' 
+			ORDER BY od ASC
+	</select>
+
+
+	<!--
+	## 배송비 정보
+	-->
+	<select id="getTrans">
+		SELECT
+			tb1.*, tb2.bigo, tb2.code_nm2
+		FROM
+			wt_trans_info tb1
+		JOIN
+			wt_code2 tb2
+		ON
+			tb2.code_cd2=tb1.const_trans_cd
+		WHERE
+			const_trans_cd = #{const_trans_cd}
+	</select>
+
+	<!--
+	## 배송비 정보
+	-->
+	<select id="getTransNew">
+		WITH vw_cart_trans_list AS
+			(
+				SELECT
+					tb1.cart_seq,
+					tb1.product_cd,
+					ifnull(tb2.opt_gb,'N') AS opt_gb,
+					ifnull(tb2.qty, tb1.qty) AS qty,
+					tb3.opt_cd2
+					, tb4.sale_price
+					, ifnull(sum(tb3.opt_price),0) AS opt_price
+					,0 AS c_opt_stock_price
+					, (
+						SELECT ifnull(SUM(stock_opt_price),0) FROM wt_product_stock WHERE not(opt_gb = 'C') 
+						AND if(opt_cd2 IS NOT NULL, FIND_IN_SET(opt_cd2,GROUP_CONCAT(tb2.opt_cd)) > 0, 1)
+						AND product_cd=tb1.product_cd
+					) AS n_c_opt_stock_price
+					,free_trans_yn
+				FROM
+					wt_cart tb1
+				LEFT JOIN
+					wt_cart_opt tb2
+				on
+					tb1.cart_seq = tb2.cart_seq
+				LEFT JOIN
+					wt_product_opt2 tb3
+				ON
+					tb3.opt_cd2=tb2.opt_cd and tb3.product_cd =  tb1.product_cd
+				JOIN
+					wt_product tb4
+				ON
+					tb4.product_cd = tb1.product_cd
+				WHERE 
+					tb1.cart_seq IN ( ${custseq} ) 
+					
+				GROUP BY
+					tb1.cart_seq, tb2.opt_gb, tb3.opt_cd2
+				HAVING
+					opt_gb='I'
+
+				UNION
+
+				SELECT
+					tb1.cart_seq,
+					tb1.product_cd,
+					ifnull(tb2.opt_gb,'N') AS opt_gb,
+					ifnull(tb2.qty, tb1.qty) AS qty,
+					tb3.opt_cd2
+					, tb4.sale_price
+					, ifnull(sum(tb3.opt_price),0) AS opt_price
+					, (
+						SELECT ifnull(SUM(stock_opt_price),0) FROM wt_product_stock WHERE opt_gb = 'C' AND product_cd=tb1.product_cd
+						AND if(opt_val1 IS NOT NULL, FIND_IN_SET(opt_val1,GROUP_CONCAT(tb2.opt_cd)) > 0, 1)
+						AND if(opt_val2 IS NOT NULL, FIND_IN_SET(opt_val2,GROUP_CONCAT(tb2.opt_cd)) > 0, 1)
+						AND if(opt_val3 IS NOT NULL, FIND_IN_SET(opt_val3,GROUP_CONCAT(tb2.opt_cd)) > 0, 1)
+					) AS c_opt_stock_price
+					,0 AS n_c_opt_stock_price
+					,free_trans_yn
+				FROM
+					wt_cart tb1
+				LEFT JOIN
+					wt_cart_opt tb2
+				on
+					tb1.cart_seq = tb2.cart_seq
+				LEFT JOIN
+					wt_product_opt2 tb3
+				ON
+					tb3.opt_cd2=tb2.opt_cd and tb3.product_cd =  tb1.product_cd
+				JOIN
+					wt_product tb4
+				ON
+					tb4.product_cd = tb1.product_cd
+				WHERE 
+					tb1.cart_seq IN ( ${custseq} ) 
+				GROUP BY
+					tb1.cart_seq, tb2.opt_gb
+				HAVING
+					not(opt_gb = 'I')
+				
+			)
+
+			SELECT
+				SUM(total_price) as total_price, SUM(trans_price) as trans_price
+			FROM
+			(
+				SELECT 
+						
+					sum(if(opt_gb='I',(opt_price*qty),( sale_price+opt_price+c_opt_stock_price )*qty ))  AS total_price,
+					if(
+						 t2.const_trans_limit > (sum(if(opt_gb='I',(opt_price*qty),( sale_price+opt_price+c_opt_stock_price )*qty ))) , t2.const_trans_price, 0
+					
+					) AS trans_price
+
+				FROM vw_cart_trans_list t1
+				JOIN
+					wt_trans_info t2
+				ON
+					t2.const_trans_cd = t1.free_trans_yn
+				GROUP BY
+					free_trans_yn
+				ORDER BY 
+					t2.const_trans_cd ASC
+			) TT
+	</select>
+
+	<!--
+	제한 수량 체크
+	-->
+	<select id="checkExistLimitProduct">
+		SELECT 
+			* 
+		FROM
+			wt_cart 
+		WHERE 
+			product_cd = #{product_cd} 
+			AND iscurr='F' 
+			AND use_yn= 'N' 
+			AND reg_date BETWEEN  DATE_ADD(NOW(),INTERVAL -1 WEEK ) and  NOW()
+			<if test="cust_seq != null">
+				AND cust_seq = #{cust_seq}
+			</if>
+			<if test="cust_seq == null">
+				AND session_id = #{session_id}
+			</if>
+	</select>
+
+
+	<!--
+	제품 제한 수량 가져오기
+	-->
+	<select id="getLimitCntProduct">
+		SELECT order_limit_cnt FROM wt_product WHERE product_cd = #{product_cd}
+	</select>
+
+
+
+
+	<select id="get_cart_num_by_cust_seq">
+		SELECT COUNT(*) AS count FROM wt_cart 
+		<if test="session_id != null and session_id != ''">
+			WHERE session_id=#{session_id}
+		</if>
+	</select>
+
+	<select id="check_overlap_product">
+		SELECT * , COUNT(*) AS cnt
+				FROM (
+					SELECT tb1.product_cd, tb3.product_nm, GROUP_CONCAT(tb2.opt_cd) AS new_opt_cd, GROUP_CONCAT(tb2.w_opt) AS new_w_opt, tb1.cart_seq
+					from wt_cart tb1
+					JOIN wt_product tb3
+					ON tb1.product_cd = tb3.product_cd
+					LEFT OUTER join wt_cart_opt tb2
+					on tb1.cart_seq = tb2.cart_seq
+					WHERE tb1.use_yn = 'N'
+					AND tb1.tmp_order_yn = 'Y'
+					AND tb3.product_state = '2'
+					AND tb3.del_yn = 'N'
+					<if test="cust_seq != null">
+						AND tb1.cust_seq = #{cust_seq}
+					</if>
+					<if test="cust_seq == null">
+						AND tb1.session_id = #{session_id}
+					</if>
+					GROUP BY  tb1.cart_seq
+				) tb1
+				GROUP BY tb1.product_cd, new_opt_cd, new_w_opt
+				HAVING cnt > 1
+				limit 1
+	</select>
+
+	<select id="member_grp_info">
+	SELECT tb1.* 
+	FROM wt_member_grp tb1, wt_member tb2
+	WHERE tb1.member_grp_cd = tb2.member_grp_cd and tb2.cust_seq = #{cust_seq}
+	</select>
+
+	<select id="checkQty">
+	SELECT * FROM wt_cart_opt WHERE cart_seq  IN (#{cart_seq}) AND qty < 1
+	</select>
+
+    <select id="check_option">
+        SELECT * FROM wt_product_opt2 WHERE opt_cd2 = #{opt_cd2} AND product_cd = #{product_cd} 
+    </select>
+
+    <select id="check_gb">
+        SELECT * FROM wt_product_opt1 WHERE opt_cd1 = #{opt_cd} AND product_cd = #{product_cd}
+    </select>
+
+</mapper>

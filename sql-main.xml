@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="main">
+    <select id="get_insta_token">
+        SELECT * FROM wt_insta_token WHERE insta_usernm = #{insta_usernm} ORDER BY seq DESC limit 0, 1
+    </select>
+
+    <insert id="insert_token">
+        INSERT INTO 
+            wt_insta_token 
+        SET
+            insta_usernm = #{insta_usernm} ,
+            access_token = #{access_token} ,
+            reg_date = NOW() ,
+            update_date = NOW()
+    </insert>
+
+    <select id="long_token_info">
+        SELECT access_token, DATEDIFF( date( NOW() ) , update_date ) AS remain_date , expires_in FROM wt_insta_token WHERE insta_usernm = #{insta_usernm}
+    </select>
+
+    <update id="update_insta_token">
+        UPDATE 
+            wt_insta_token 
+        SET 
+            access_token = #{access_token} , 
+            expires_in = #{expires_in} , 
+            update_date = sysdate() 
+            WHERE insta_usernm = #{insta_usernm}
+    </update>
+
+    <select id="get_insta_media_info">
+            SELECT tb1.access_token, tb1.update_date, DATE_FORMAT(NOW(), '%Y-%m-%d') as now_date
+            , ( SELECT tb2.media_id FROM wt_insta_data tb2 WHERE tb1.insta_usernm = tb2.username ORDER BY tb2.update_date DESC LIMIT 1 ) AS data_media_id 
+            , ( SELECT IF( DATE_FORMAT(tb2.update_date, '%Y-%m-%d') = '0000-00-00',  date_add(DATE_FORMAT(NOW(), '%Y-%m-%d'),INTERVAL -1 DAY) , DATE_FORMAT(tb2.update_date, '%Y-%m-%d'))   
+            FROM wt_insta_data tb2 WHERE tb1.insta_usernm = tb2.username ORDER BY tb2.update_date DESC LIMIT 1 ) AS data_max_update_date
+            FROM wt_insta_token tb1 
+            WHERE insta_usernm =  #{insta_usernm}
+    </select>
+
+    <select id="get_insta_media_id">
+        SELECT media_id FROM wt_insta_data WHERE media_id= #{media_id} AND username = #{insta_usernm} ORDER BY seq DESC
+    </select>
+
+    <update id="update_media_id">
+        UPDATE 
+            wt_insta_data 
+        SET 
+            media_url = #{media_url} , 
+            update_date = NOW() 
+        WHERE media_id = #{media_id} AND username = #{insta_usernm}
+    </update>
+
+    <insert id="insert_media_data">
+        INSERT INTO 
+            wt_insta_data 
+        SET
+            media_id = #{media_id} ,
+            media_type = #{media_type} ,
+            media_url = #{media_url} ,
+            permalink = #{permalink} ,
+            username = #{insta_user} ,
+            timestamp = #{timestamp} ,
+            reg_date = #{reg_date} ,
+            update_date = #{update_date}
+    </insert>
+
+    <select id="get_insta_data">
+        SELECT * FROM wt_insta_data WHERE username = #{insta_usernm} ORDER BY seq DESC limit 0, 5
+    </select>
+
+
+</mapper>

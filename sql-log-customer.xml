@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//reviewEN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="log-customer">
+    <select id="insert_staytime">
+        INSERT 
+            py_page_staytime_log_tbl
+        SET 
+            log_date = #{log_date}
+            , staytime_sec = #{staytime_sec}
+            , user_id = #{user_id}
+            , session_id = #{session_id} 
+            , page_url = #{page_url} 
+     
+    </select>
+     <select id="insert_click">
+        INSERT 
+            py_click_log_tbl
+        SET 
+            log_date = #{log_date}
+            , user_id = #{user_id}
+            , session_id = #{session_id}
+            , click_div = #{click_div} 
+            , click_value = #{click_value}
+            , page_url = #{page_url} 
+    </select>
+
+    <select id="insert_ip">
+        INSERT 
+            py_session_log_info_tbl
+        SET 
+            session_id = #{session_id}
+            , log_date = #{log_date}
+            , ip_add = #{ip} 
+    </select>
+    
+</mapper>

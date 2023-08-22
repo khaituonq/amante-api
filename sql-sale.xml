@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//reviewEN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sale">
+    <select id="get_category_list">
+        SELECT
+            tb3.*,(
+            SELECT
+                count(*) 
+            FROM
+                wt_product tb2 
+            WHERE
+                <![CDATA[round(( tb2.supply_price - tb2.sale_price )/ tb2.supply_price * 100 ) >= 31]]>
+                AND <![CDATA[tb2.fee_rate >= 31]]> 
+                AND tb2.product_type = 'N' 
+                AND tb2.product_state NOT IN ( '1', '3' ) 
+                AND tb2.del_yn = 'N' 
+                AND tb2.product_cd IN ( SELECT product_cd FROM wt_product_category WHERE category1_cd = tb3.category_cd ) 
+            ) AS cate_count 
+        FROM
+            wt_category AS tb3 
+        WHERE
+            ISNULL( category_m_cd ) 
+            AND tb3.use_yn = 'Y' 
+        ORDER BY
+            od ASC
+    </select>
+
+    <select id="get_shop_list">
+         SELECT tb1.*
+            , tb2.product_cd, tb2.product_nm, tb2.product_state, tb2.supply_price, tb2.sale_price, tb2.discount_gb, tb2.fee_rate, tb2.product_cd, tb2.icon
+            , (select count(*) from wt_use_review where product_cd = tb2.product_cd and use_yn = 'Y') as review_cnt
+            , ifnull((select round(avg(POINT),1) from wt_use_review where product_cd = tb2.product_cd),0) as review_avg_point
+       
+        <if test="cust_seq != null">
+			, CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = tb1.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on
+		</if>
+		<if test="cust_seq == null">
+			, 'N' wish_click_on
+		</if>
+            , ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+        FROM 
+            wt_group_product tb1
+        LEFT JOIN 
+            wt_product tb2
+            ON tb2.product_cd = tb1.product_cd
+        WHERE 1=1
+            <if test="category1_cd != '' && category1_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category1_cd = #{category1_cd})
+            </if>
+            <if test="category2_cd != '' && category2_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category2_cd = #{category2_cd})
+            </if>
+            <if test="category3_cd != '' && category3_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category3_cd = #{category3_cd})
+            </if>
+        AND tb1.group_cd = #{group_cd}
+        AND tb2.product_type = 'N'
+        AND tb2.product_state not in ('1','3')
+        AND tb2.del_yn ='N'
+        ORDER BY tb1.od asc
+    </select>
+
+    <select id="get_shop_total">
+         SELECT count(*) as cnt
+        FROM 
+            wt_group_product tb1
+        LEFT JOIN 
+            wt_product tb2
+            ON tb2.product_cd = tb1.product_cd
+        WHERE 1=1
+            <if test="category1_cd != '' && category1_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category1_cd = #{category1_cd})
+            </if>
+            <if test="category2_cd != '' && category2_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category2_cd = #{category2_cd})
+            </if>
+            <if test="category3_cd != '' && category3_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category3_cd = #{category3_cd})
+            </if>
+        AND tb1.group_cd = #{group_cd}
+        AND tb2.product_type = 'N'
+        AND tb2.product_state not in ('1','3')
+        AND tb2.del_yn ='N'
+        ORDER BY tb1.od asc
+    </select>
+
+    <select id="get_list">
+        SELECT
+            tb1.product_cd,
+            tb1.product_nm,
+            tb1.product_state,
+            tb1.supply_price,
+            tb1.sale_price,
+            tb1.discount_gb,
+            tb1.fee_rate,
+            tb1.product_cd,
+            tb1.icon,
+            tb2.*,
+            ( SELECT count(*) FROM wt_use_review WHERE product_cd = tb1.product_cd AND use_yn = 'Y' ) AS review_cnt,
+            ( SELECT count(*) FROM wt_product_opt1 WHERE product_cd = tb1.product_cd AND use_yn = 'Y' ) AS option_cnt,
+            ( SELECT opt_cd1 FROM wt_product_opt1 WHERE product_cd = tb1.product_cd AND use_yn = 'Y' LIMIT 1 ) AS opt_cd1,
+            ( SELECT code_nm2 FROM wt_code2 WHERE code_cd1 = '900' AND code_cd2 = tb1.brand_cd ) AS brand_nm,
+            ( SELECT file_nm1 FROM wt_brand WHERE brand_type = tb1.brand_cd ) AS brand_logo,
+            ( SELECT rgb_cd FROM wt_brand WHERE brand_type = tb1.brand_cd ) AS brand_rgb_cd,
+            ( SELECT brand_nm FROM wt_brand WHERE brand_type = tb1.brand_cd ) AS brand_intro,
+            ifnull(( SELECT round( avg( POINT ), 1 ) FROM wt_use_review WHERE product_cd = tb1.product_cd ), 0 ) AS review_avg_point,
+            ifnull(( SELECT sum( stock ) FROM wt_product_stock WHERE product_cd = tb1.product_cd ), 0 ) AS stock_sum_cnt,
+            <if test="cust_seq != '' || cust_seq != null">
+                ifnull(( SELECT 'on' FROM wt_wishlist WHERE product_cd = tb1.product_cd AND cust_seq = #{cust_seq} LIMIT 1 ), '' ) AS wish_click_on,
+            </if>
+            ( SELECT COUNT(*) FROM wt_order_product WHERE product_cd = tb1.product_cd AND product_order_state_cd IN ( '20', '30', '35', '40' ) ) + ( SELECT COUNT(*) FROM wt_use_review WHERE product_cd = tb1.product_cd AND use_yn = 'Y' ) AS sale_cnt,
+            ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb1.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img 
+        FROM
+            wt_product tb1
+            LEFT JOIN wt_product_detail tb2 ON tb2.product_cd = tb1.product_cd 
+        WHERE
+            1 = 1 
+            AND <![CDATA[round(( tb1.supply_price - tb1.sale_price )/ tb1.supply_price * 100 ) >= 31 ]]>
+            AND <![CDATA[tb1.fee_rate >= 31]]>
+            AND product_type = 'N' 
+            AND product_state NOT IN ( '1', '3' ) 
+            AND tb1.del_yn = 'N'
+            <if test="category1_cd != '' && category1_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category1_cd = #{category1_cd})
+            </if>
+            <if test="category2_cd != '' && category2_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category2_cd = #{category2_cd})
+            </if>
+            <if test="category3_cd != '' && category3_cd != null">
+                and tb1.product_cd in ( select product_cd from wt_product_category where category3_cd = #{category3_cd})
+            </if>
+            <if test="stock_yn != null && stock_yn == 'Y'">
+                and tb1.product_cd in ( select product_cd from wt_product_stock where product_cd = tb1.product_cd and soldout_yn = 'N' ) and tb1.product_state not in('4', '3')
+            </if>
+            <if test="order_by == '' && order_by == null">
+                ORDER BY tb1.reg_date DESC, tb1.mod_date desc
+            </if>
+    </select>
+
+    <select id="get_total">
+        SELECT count(*) as cnt
+        FROM wt_product tb1
+        LEFT JOIN wt_product_detail tb2
+        ON tb2.product_cd = tb1.product_cd
+        WHERE 1=1
+        AND <![CDATA[round(( tb1.supply_price - tb1.sale_price ) / tb1.supply_price * 100 ) >= 31 ]]>
+        AND <![CDATA[tb1.fee_rate >= 31]]>
+        AND product_type = 'N'
+        AND product_state not in ('1','3')
+        AND tb1.del_yn ='N'
+        <if test="category1_cd != '' && category1_cd != null">
+            and tb1.product_cd in ( select product_cd from wt_product_category where category1_cd = #{category1_cd})
+        </if>
+        <if test="category2_cd != '' && category2_cd != null">
+            and tb1.product_cd in ( select product_cd from wt_product_category where category2_cd = #{category2_cd})
+        </if>
+        <if test="category3_cd != '' && category3_cd != null">
+            and tb1.product_cd in ( select product_cd from wt_product_category where category3_cd = #{category3_cd})
+        </if>
+        <if test="stock_yn != null && stock_yn == 'Y'">
+            and tb1.product_cd in ( select product_cd from wt_product_stock where product_cd = tb1.product_cd and soldout_yn = 'N' ) and tb1.product_state not in('4', '3')
+        </if>
+        <if test="order_by == A">
+            ORDER BY tb1.reg_date DESC
+        </if>
+        <if test="order_by == B">
+            ORDER BY tb1.sale_price ASC
+        </if>
+        <if test="order_by == C">
+            ORDER BY tb1.sale_price DESC
+        </if>
+        <if test="order_by == D">
+            ORDER BY tb1.vw_cnt DESC
+        </if>
+        <if test="order_by == E">
+            ORDER BY tb1.review_cnt DESC
+        </if>
+        <if test="order_by == F">
+            ORDER BY review_avg_point desc
+        </if>
+        <if test="order_by == G">
+            ORDER BY tb1.product_nm desc
+        </if>
+        <if test="order_by == H">
+            ORDER BY tb1.fee_rate desc
+        </if>
+        <if test="order_by == I">
+            ORDER BY tb1.order_cnt desc
+        </if>
+    </select>
+</mapper>

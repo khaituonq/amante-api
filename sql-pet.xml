@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="pet">
+    <select id="get_category_list">
+        SELECT * FROM wt_category WHERE category_m_cd = #{category_m_cd}
+    </select>
+
+    <select id="get_icon_list">
+        SELECT * FROM wt_group WHERE 1 = 1 AND 
+            <foreach collection="group_cds" item="group_cd" open="(" close=")" separator="OR">
+                group_cd = #{group_cd}
+            </foreach>
+    </select>
+
+    <select id="get_icon_product_list">
+        SELECT tb3.product_cd, tb3.product_nm, tb3.product_state, tb3.supply_price, tb3.sale_price, tb3.discount_gb, tb3.fee_rate, tb3.product_cd, tb3.icon
+		, (select count(*) from wt_use_review where product_cd = tb2.product_cd and use_yn = 'Y') as review_cnt
+        , ifnull((select round(avg(POINT),1) from wt_use_review where product_cd = tb2.product_cd),0) as review_avg_point
+        <if test="cust_seq != null">
+		,	CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = tb3.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on
+		</if>
+		<if test="cust_seq == null">
+		,   'N' wish_click_on
+		</if>
+        , ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb3.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+        FROM wt_group tb1, wt_group_product tb2, wt_product tb3
+        WHERE tb1.group_cd = tb2.group_cd
+        and tb2.product_cd = tb3.product_cd
+        and tb1.group_cd = #{group_cd}
+        and tb3.del_yn = 'N'
+    </select>
+
+    <select id="get_event_list">
+        SELECT tb1.*
+        ,(SELECT COUNT(*) FROM wt_like_info WHERE gubun = 'L' AND sort='event' AND ref_seq = tb1.event_board_seq ) AS like_cnt
+        FROM wt_event_board tb1
+        WHERE event_seq = #{event_seq}
+        AND use_yn ='Y'
+        AND admin_reply_yn <> 'A'
+        ORDER BY reg_date DESC
+        <if test="start_num >= 0 && row_count > 0">
+            LIMIT ${start_num}, ${row_count}
+        </if>
+    </select>
+
+</mapper>

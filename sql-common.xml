@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common">
+
+
+	<!--
+	/**
+     * 공통코드 조회
+     */
+	-->
+	<select id="get_code_list">
+		select * from wt_code2 where code_cd1 = #{code_cd1} and use_yn = 'Y' order by od asc
+	</select>
+
+
+	<!--
+	/**
+     * 리스트 소팅 코드 조회
+     */
+	-->
+	<select id="get_sort_code_list">
+		select * from wt_code2 where code_cd1 = #{code_cd1} and use_yn = 'Y' order by od asc
+	</select>
+
+	
+
+
+	<!--
+	/**
+     * 공통 배송비 조회
+     * 기본 값은 2001 기본배송
+     */
+	-->
+	<select id="get_trans_info">
+		select * from wt_trans_info where const_trans_cd = #{free_trans_yn}
+	</select>
+	
+
+
+	<!--
+	/**
+     * 공통 단일배송비 조회
+     */
+	-->
+	<select id="get_single_trans_info">
+		select case when const_trans_price > const_trans_limit then 0 else const_trans_price end as fee
+		from wt_trans_info WHERE const_trans_cd = #{const_trans_cd} 
+	</select>
+
+	<!--
+	// 공통 배너
+	-->
+	<select id="get_banner">
+		select * from wt_banner
+		where banner_cd = #{banner_cd} and use_yn = 'Y'
+		and date_format(display_Sdate, '%Y-%m-%d %H:%i') <![CDATA[ <= ]]> SUBSTR(NOW(), 1, 16)
+		and date_format(display_Edate, '%Y-%m-%d %H:%i') >= SUBSTR(NOW(), 1, 16)
+		order by od asc, reg_date desc limit 1
+	</select>
+
+
+
+
+	<select id="getProductAvgPoint">
+		SELECT ROUND(AVG(point),2) as total_avg FROM wt_use_review WHERE product_cd = #{product_cd}
+	</select>
+
+
+
+	<select id="exists_wishlist">
+		SELECT *
+		FROM wt_wishlist tb1
+		WHERE product_cd = #{product_cd}
+		AND cust_seq = #{cust_seq}
+	</select>
+
+
+	
+	<select id="insert_wishlist">
+		INSERT INTO wt_wishlist (cust_seq, product_cd, reg_date) VALUES (#{cust_seq}, #{product_cd}, NOW())
+	</select>
+
+
+
+	<select id="del_wishlist">
+		DELETE FROM wt_wishlist WHERE cust_seq = #{cust_seq} AND product_cd = #{product_cd} 
+	</select>
+
+
+	<select id="update_view_count">
+		UPDATE vn_concept_room SET vw_cnt = vw_cnt + 1 WHERE concept_room_seq = #{concept_room_seq}
+	</select>
+
+
+	<select id="update_download_image_count">
+		UPDATE vn_concept_room SET dl_cnt = dl_cnt + 1 WHERE concept_room_seq = #{concept_room_seq}
+	</select>
+
+
+</mapper>

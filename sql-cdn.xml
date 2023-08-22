@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cdn">
+    <select id="get_cdn">
+        SELECT 
+            (CASE A.service_div
+                WHEN '1' THEN 'VN'
+                WHEN '2' THEN 'CLOSE_ALL'
+                WHEN '3' THEN 'OPEN_ALL'
+            END) as service_div
+        FROM py_cdn_infor_tbl A;
+    </select>
+
+    <select id="get_all_cdn">
+        SELECT * FROM py_cdn_infor_tbl A;
+    </select>
+
+    <update id="update_cdn">
+        UPDATE py_cdn_infor_tbl SET service_div = ${service_div} WHERE seq = 1
+    </update>
+
+
+</mapper>

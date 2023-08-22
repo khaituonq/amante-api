@@ -1,0 +1,1172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//reviewEN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="product">
+	<!-- product etc -->
+
+
+
+
+
+
+
+
+
+	<select id="ProductCount">
+		SELECT 
+			count(pro.product_cd) cnt
+		FROM 
+			wt_product pro
+			<if test="(category1_cd != null and category1_cd != '') or (category2_cd != null and category2_cd != '' ) or (category3_cd != null and category3_cd != '' ) ">
+			inner join 
+				(SELECT distinct p1.product_cd 
+					FROM wt_product p1
+						LEFT OUTER JOIN wt_product_category pcate ON p1.product_cd = pcate.product_cd
+					where 1=1
+						<if test="category1_cd != null and category1_cd != ''">
+							and pcate.category1_cd = #{category1_cd}
+						</if>
+						<if test="category2_cd != null and category2_cd != ''">
+							and pcate.category2_cd = #{category2_cd}
+						</if>
+						<if test="category3_cd != null and category3_cd != ''">
+							and pcate.category3_cd = #{category3_cd}
+						</if>
+				) p on pro.product_cd = p.product_cd
+			</if>
+		WHERE 
+			1=1
+			and pro.product_type = 'N'
+			and pro.product_state = '2'
+			/* and pro.group_yn = 'Y' */
+			and pro.del_yn = 'N'
+
+			
+			<if test="group_cd != null and group_cd != ''">
+				and pro.group_cd = #{group_cd}
+			</if>
+			<if test="brand_cd != null and brand_cd != ''">
+				and pro.brand_cd = #{brand_cd}
+			</if>
+			<if test="product_nm != null and product_nm != ''">
+				and (pro.product_nm = #{product_nm} or pro.product_nm like '%${product_nm}$' or pro.product_nm like '%${product_nm}' or pro.product_nm like '${product_nm}%' )
+			</if>
+
+			/* ---------------------------- ADD conditions ---------------------------------------- */
+			<if test="inStock == 'true' and inStock != ''">
+				and pro.product_cd in ( select product_cd from wt_product_stock where product_cd = pro.product_cd and soldout_yn = 'N' ) and pro.product_state not in('4', '3') 
+			</if>
+
+			<if test="shCate1Cd != null and shCate1Cd != ''">
+				AND pro.product_cd IN ( SELECT product_cd FROM wt_product_category WHERE category1_cd = #{shCate1Cd})
+			</if>
+
+			<if test="shCate2Cd != null and shCate2Cd != ''">
+				AND pro.product_cd IN ( SELECT product_cd FROM wt_product_category WHERE category2_cd = #{shCate2Cd})
+			</if>
+
+			<if test="shCate3Cd != null and shCate3Cd != ''">
+				AND pro.product_cd IN ( SELECT product_cd FROM wt_product_category WHERE category3_cd = #{shCate3Cd})
+			</if>
+
+			<if test="keyword != '' and keyword != 'undefined' and keyword != null">
+				AND (
+					pro.product_nm REGEXP #{replaceKeyword} 
+					OR pro.keywd REGEXP #{replaceKeyword} 
+					OR pro.product_nm_eng REGEXP #{replaceKeyword} 
+					OR pro.brand_cd IN ( SELECT code_cd2 FROM wt_code2 WHERE code_nm2 REGEXP #{replaceKeyword} ) 
+					OR pro.product_nm LIKE "%#{replaceKeyword2}%" 
+					OR pro.keywd LIKE "%#{replaceKeyword2}%" 
+					OR pro.product_nm_eng LIKE "%#{replaceKeyword2}%" 
+					OR pro.brand_cd IN ( SELECT code_cd2 FROM wt_code2 WHERE code_nm2 LIKE "%#{replaceKeyword2}%" ) 
+					OR FIND_IN_SET( '5cm', pro.product_cd ) 
+					OR REPLACE ( pro.product_nm, ' ', '' ) LIKE REPLACE ( "%#{replaceKeyword2}%", ' ', '' ) 
+					OR REPLACE ( pro.keywd, ' ', '' ) LIKE REPLACE ( "%#{replaceKeyword2}%", ' ', '' ) 
+					OR pro.product_nm REGEXP #{replaceKeyword} 
+					OR pro.product_nm REGEXP #{replaceKeyword} 
+				) 
+				AND (
+					NOT EXISTS ( SELECT * FROM py_exception_word_tbl WHERE exception_word = #{replaceKeyword} AND div_code = 1 ) 
+				AND NOT EXISTS ( SELECT * FROM py_exception_word_tbl WHERE exception_word LIKE concat( '%', #{replaceKeyword}, '%' ) AND div_code = 1 )) 
+				OR pro.product_nm LIKE concat( '%', ( SELECT change_word FROM py_same_word_tbl WHERE search_word = #{replaceKeyword} ), '%' )
+			</if>
+			/* ---------------------------------------------------------------- */
+			
+	</select>
+	
+	<select id="ProductList">
+		SELECT 
+			pro.product_cd,
+			pro.product_code,
+			pro.product_state,
+			pro.brand_cd,
+			/*
+			cate1.category_nm as category1_nm,
+			cate2.category_nm as category2_nm,
+			cate3.category_nm as category3_nm,
+			*/
+
+			pro.product_nm,
+			pro.product_etc_nm,
+			pro.product_deal_nm,
+			pro.product_nm_eng,
+			pro.product_nm_mb,
+			pro.model_name,
+			pro.product_stock,
+			pro.supply_price,
+			pro.sale_price,
+			pro.fee_rate,
+			pro.reserve_rate,
+			pro.keywd,
+			pro.icon,
+			pro.gid,
+			pro.main_img,
+			pro.sub_img1,
+			pro.sub_img2,
+			pro.sub_img3,
+			pro.sub_img4,
+			pro.discount_gb,
+			pro.product_url,
+			pro.vw_cnt,
+			/* pro.hits */
+			pro.review_cnt,
+			pro.order_cnt,
+			pro.point,
+			(select file_nm from wt_product_file where product_cd = pro.product_cd order by product_file_seq DESC limit 1) as product_main_img,
+			
+			<if test="cust_seq != null">
+				CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = pro.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on
+			</if>
+			
+			<if test="cust_seq == null">
+			    'N' wish_click_on
+			</if>
+		FROM 
+			wt_product pro
+			<if test="(category1_cd != null and category1_cd != '') or (category2_cd != null and category2_cd != '' ) or (category3_cd != null and category3_cd != '' ) ">
+			inner join 
+				(SELECT distinct p1.product_cd 
+					FROM wt_product p1
+						LEFT OUTER JOIN wt_product_category pcate ON p1.product_cd = pcate.product_cd
+					where 1=1
+						<if test="category1_cd != null and category1_cd != ''">
+							and pcate.category1_cd = #{category1_cd}
+						</if>
+						<if test="category2_cd != null and category2_cd != ''">
+							and pcate.category2_cd = #{category2_cd}
+						</if>
+						<if test="category3_cd != null and category3_cd != ''">
+							and pcate.category3_cd = #{category3_cd}
+						</if>
+				) p on pro.product_cd = p.product_cd
+			</if>
+		WHERE 
+			1=1
+			and pro.product_type = 'N'
+			and pro.product_state = '2'
+			/* and pro.group_yn = 'Y' */
+			and pro.del_yn = 'N'
+			
+			<if test="group_cd != null and group_cd != ''">
+				and pro.group_cd = #{group_cd}
+			</if>
+			<if test="brand_cd != null and brand_cd != ''">
+				and pro.brand_cd = #{brand_cd}
+			</if>
+			<if test="product_nm != null and product_nm != ''">
+				and (pro.product_nm = #{product_nm} or pro.product_nm like '%${product_nm}$' or pro.product_nm like '%${product_nm}' or pro.product_nm like '${product_nm}%' )
+			</if>
+
+
+
+
+
+			/* ---------------------------- ADD conditions ---------------------------------------- */
+			<if test="inStock == 'true' and inStock != ''">
+				and pro.product_cd in ( select product_cd from wt_product_stock where product_cd = pro.product_cd and soldout_yn = 'N' ) and pro.product_state not in('4', '3') 
+			</if>
+
+			<if test="shCate1Cd != null and shCate1Cd != ''">
+				AND pro.product_cd IN ( SELECT product_cd FROM wt_product_category WHERE category1_cd = #{shCate1Cd})
+			</if>
+
+			<if test="shCate2Cd != null and shCate2Cd != ''">
+				AND pro.product_cd IN ( SELECT product_cd FROM wt_product_category WHERE category2_cd = #{shCate2Cd})
+			</if>
+
+			<if test="shCate3Cd != null and shCate3Cd != ''">
+				AND pro.product_cd IN ( SELECT product_cd FROM wt_product_category WHERE category3_cd = #{shCate3Cd})
+			</if>
+
+			<if test="keyword != '' and keyword != undefined and keyword != null">
+				AND (
+					pro.product_nm REGEXP #{replaceKeyword} 
+					OR pro.keywd REGEXP #{replaceKeyword} 
+					OR pro.product_nm_eng REGEXP #{replaceKeyword} 
+					OR pro.brand_cd IN ( SELECT code_cd2 FROM wt_code2 WHERE code_nm2 REGEXP #{replaceKeyword} ) 
+					OR pro.product_nm LIKE "%#{replaceKeyword2}%" 
+					OR pro.keywd LIKE "%#{replaceKeyword2}%" 
+					OR pro.product_nm_eng LIKE "%#{replaceKeyword2}%" 
+					OR pro.brand_cd IN ( SELECT code_cd2 FROM wt_code2 WHERE code_nm2 LIKE "%#{replaceKeyword2}%" ) 
+					OR FIND_IN_SET( '5cm', pro.product_cd ) 
+					OR REPLACE ( pro.product_nm, ' ', '' ) LIKE REPLACE ( "%#{replaceKeyword2}%", ' ', '' ) 
+					OR REPLACE ( pro.keywd, ' ', '' ) LIKE REPLACE ( "%#{replaceKeyword2}%", ' ', '' ) 
+					OR pro.product_nm REGEXP #{replaceKeyword} 
+					OR pro.product_nm REGEXP #{replaceKeyword} 
+				) 
+				AND (
+					NOT EXISTS ( SELECT * FROM py_exception_word_tbl WHERE exception_word = #{replaceKeyword} AND div_code = 1 ) 
+				AND NOT EXISTS ( SELECT * FROM py_exception_word_tbl WHERE exception_word LIKE concat( '%', #{replaceKeyword}, '%' ) AND div_code = 1 )) 
+				OR pro.product_nm LIKE concat( '%', ( SELECT change_word FROM py_same_word_tbl WHERE search_word = #{replaceKeyword} ), '%' )
+			</if>
+			/* ---------------------------------------------------------------- */
+
+
+
+
+
+		ORDER BY 
+			<if test="sort != null and sort != ''">
+				<choose>
+					<when test="sort == 'order'">
+						order_cnt desc
+					</when>
+					<when test="sort == 'review'">
+						review_cnt desc
+					</when>
+				</choose>
+			</if>
+			<if test="sort == null or sort == ''">
+				pro.od asc
+			</if>
+
+
+
+
+			/* ----------------------------- ADD conditions ------------------------------ */
+			<if test="orderBy != null and orderBy != ''">
+				<if test="orderBy == 'A'">
+					,pro.reg_date DESC
+				</if>
+				<if test="orderBy == 'B'">
+					,pro.sale_price ASC, FIELD(product_state, '1', '2', '4') ASC
+				</if>
+				<if test="orderBy == 'C'">
+					,pro.sale_price DESC, FIELD(product_state, '1', '2', '4') ASC
+				</if>
+				<if test="orderBy == 'D'">
+					,pro.vw_cnt DESC, FIELD(product_state, '1', '2', '4') ASC
+				</if>
+				<if test="orderBy == 'E'">
+					,pro.review_cnt DESC, FIELD(product_state, '1', '2', '4') ASC
+				</if>
+				<if test="orderBy == 'F'">
+					,review_avg_point desc, FIELD(product_state, '1', '2', '4') ASC 
+				</if>
+				<if test="orderBy == 'G'">
+					,pro.review_cnt desc, FIELD(product_state, '1', '2', '4') ASC
+				</if>
+				<if test="orderBy == 'H'">
+					,pro.fee_rate desc, FIELD(product_state, '1', '2', '4') ASC
+				</if>
+				<if test="orderBy == 'I'">
+					,ORDER BY pro.order_cnt desc, FIELD(product_state, '1', '2', '4') ASC 
+				</if>
+			</if>
+			/* --------------------------------------------------------------------------- */
+
+
+
+
+	</select>
+
+
+	<select id="Product">
+		SELECT
+			*,
+			( select count(*) from wt_use_review where product_cd = pro.product_cd and use_yn = 'Y') as review_count,
+			( SELECT soldout_yn FROM wt_product_stock WHERE product_cd = pro.product_cd AND opt_val1 IS null AND opt_val2 IS null AND opt_val3 IS null AND opt_cd1 IS null AND opt_cd2 IS null LIMIT 1) AS stock_soldout_yn,
+			
+			<if test="cust_seq != null">
+				CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = pro.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on,
+				IFNULL((SELECT SUM(stb2.qty) FROM wt_order_info stb1 JOIN wt_order_product stb2 ON stb1.ocode = stb2.ocode WHERE stb1.order_yn ='Y' AND stb1.cust_seq=#{cust_seq} AND pro.product_cd = stb2.product_cd ), 0 ) AS order_qty
+			</if>
+			
+			<if test="cust_seq == null">
+			    'N' wish_click_on,
+				0 order_qty
+			</if>
+		FROM
+			wt_product pro
+		WHERE
+			1=1
+			and pro.product_cd = #{product_cd}
+	</select>
+
+
+	<select id="ProductFileList">
+		SELECT *
+		FROM
+			wt_product_file pf
+		WHERE
+			1=1
+			<if test="product_cd != null and product_cd != ''">
+				and pf.product_cd = #{product_cd}
+			</if>
+			<if test="pStr != null and pStr != ''">
+				and pf.product_cd in (${pStr})
+			</if>
+		ORDER BY
+			pf.product_cd, od asc
+	</select>
+
+
+	<select id="ProductAdditionList">
+		SELECT addition_product_cd
+		FROM
+			wt_product_addition pa
+		WHERE
+			1=1
+			<if test="product_cd != null and product_cd != ''">
+				and pa.product_cd = #{product_cd}
+			</if>
+			<if test="pStr != null and pStr != ''">
+				and pa.product_cd in (${pStr})
+			</if>
+		ORDER BY
+			pa.product_cd
+	</select>
+
+
+	
+
+
+	<select id="ProductCategoryList">
+		SELECT 
+			cate.category1_cd,
+			cate.category2_cd,
+			cate.category3_cd,
+			c1.category_nm category1_nm,
+			c2.category_nm category2_nm,
+			c3.category_nm category3_nm
+		FROM
+			wt_product_category cate
+			left outer join wt_category c1 on cate.category1_cd = c1.category_cd
+			left outer join wt_category c2 on cate.category2_cd = c2.category_cd
+			left outer join wt_category c3 on cate.category3_cd = c3.category_cd
+		WHERE
+			1=1
+			<if test="product_cd != null and product_cd != ''">
+				and cate.product_cd = #{product_cd}
+			</if>
+			<if test="pStr != null and pStr != ''">
+				and cate.product_cd in (${pStr})
+			</if>
+		ORDER BY
+			product_cd
+	</select>
+
+
+	
+
+
+	<select id="ProductCon">
+		SELECT 
+			pc.content2,
+			pc.content3,
+			pc.content4
+		FROM
+			wt_product_con pc
+		WHERE
+			1=1
+	</select>
+
+
+	
+
+
+	<select id="ProductDetailList">
+		SELECT 
+			*
+		FROM
+			wt_product_detail pd
+		WHERE
+			1=1
+			<if test="product_cd != null and product_cd != ''">
+				and pd.product_cd = #{product_cd}
+			</if>
+			<if test="pStr != null and pStr != ''">
+				and pd.product_cd in (${pStr})
+			</if>
+		ORDER BY
+			pd.product_cd
+	</select>
+
+
+	
+
+
+	<!-- <select id="ProductGuideList">
+        select title, content
+          from wt_product_guide
+         where 1=1
+           and use_yn = 'Y'
+           and del_yn = 'N'
+     	<if test="cateSql != null and cateSql != ''">
+		   ${cateSql}
+		</if>
+
+         order by case when ifnull(category3_cd, '') <> '' then 1
+                       when ifnull(category2_cd, '') <> '' then 2
+                       else 3 end,
+                  reg_date desc
+         limit 1
+	</select> -->
+
+	<select id="ProductCommonGuideList">
+		SELECT 
+			*
+		FROM
+			wt_product_guide
+		WHERE
+			1=1
+			and use_yn = 'Y'
+			and del_yn = 'N'
+			and category1_cd = ''
+			and category2_cd = ''
+			and category3_cd = ''
+		order by
+			reg_date desc
+		limit 1
+	</select>
+
+
+
+
+	
+
+	<select id="ProductRelationList">
+		SELECT *
+					, (SELECT product_nm FROM wt_product WHERE product_cd = relation_product_cd AND product_type = 'N' AND product_state not in ('1','3') AND del_yn ='N') as relation_product_nm
+					, (SELECT main_img FROM wt_product WHERE product_cd = relation_product_cd AND product_type = 'N' AND product_state not in ('1','3') AND del_yn ='N' ) as relation_main_img
+					, (SELECT fee_rate FROM wt_product WHERE product_cd = relation_product_cd AND product_type = 'N' AND product_state not in ('1','3') AND del_yn ='N' ) as relation_fee_rate
+					, (SELECT supply_price FROM wt_product WHERE product_cd = relation_product_cd AND product_type = 'N' AND product_state not in ('1','3') AND del_yn ='N' ) as relation_supply_price
+					, (SELECT sale_price FROM wt_product WHERE product_cd = relation_product_cd AND product_type = 'N' AND product_state not in ('1','3') AND del_yn ='N' ) as relation_sale_price
+					, (SELECT icon FROM wt_product WHERE product_cd = relation_product_cd AND product_type = 'N' AND product_state not in ('1','3') AND del_yn ='N' ) as relation_icon
+					, (SELECT discount_gb FROM wt_product WHERE product_cd = relation_product_cd AND product_type = 'N' AND product_state not in ('1','3') AND del_yn ='N' ) as discount_gb
+					<if test="cust_seq != null">
+						, CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE wt_wishlist.product_cd = wt_product_relation.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on
+					</if>
+					<if test="cust_seq == null">
+						, 'N' wish_click_on
+					</if>
+					, (SELECT product_state FROM wt_product WHERE product_cd = relation_product_cd ) as product_state
+					, (select count(*) from wt_use_review where product_cd = relation_product_cd and use_yn = 'Y') as review_cnt
+					, ifnull((select round(avg(POINT),1) from wt_use_review where product_cd = relation_product_cd),0) as review_avg_point
+					, ( SELECT file_nm FROM wt_product_file WHERE product_cd = relation_product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+		FROM wt_product_relation
+		WHERE product_cd = ${product_cd}
+	</select>
+
+
+
+	
+	<select id="ProductOpt1List">
+		SELECT 
+			opt1.product_cd,
+			opt1.opt_gb,
+			CASE opt1.opt_gb WHEN 'I' THEN '추가' WHEN 'C' THEN '조합' WHEN 'S' THEN '개별' END opt_gbnm,
+			opt1.opt_cd1,
+			opt1.opt_nm1,
+			opt1.mandatory_yn,
+			opt1.color_yn
+		FROM
+			wt_product_opt1 opt1
+		WHERE
+			1=1
+			<if test="product_cd != null and product_cd != ''">
+				and opt1.product_cd = #{product_cd}
+			</if>
+			<if test="pStr != null and pStr != ''">
+				and opt1.product_cd in (${pStr})
+			</if>
+			AND opt1.use_yn = 'Y'
+			AND opt1.del_yn = 'N'
+		ORDER BY
+			opt1.opt_od
+	</select>
+
+	
+	<select id="ProductOpt2List">
+		SELECT 
+			A.stock_seq, A.opt_gb, CASE A.opt_gb WHEN 'I' THEN '추가' WHEN 'C' THEN '조합' WHEN 'S' THEN '개별' END opt_gbnm,
+			A.opt_val1, C.opt_nm2 opt_val1_nm,
+			A.opt_val2, D.opt_nm2 opt_val2_nm,
+			A.opt_val3, E.opt_nm2 opt_val3_nm,
+			A.opt_cd1, F.opt_nm1 opt_val_nm1, A.opt_cd2, G.opt_nm2 opt_val_nm2,
+			IFNULL(A.stock, 0) stock, 
+			IFNULL(A.limit_cnt, 0) limit_cnt, 
+			IFNULL(A.soldout_yn, 'N') soldout_yn, 
+			DATE_FORMAT(A.restock_date, '%Y-%m-%d') restock_date, 
+			IFNULL(A.use_yn, 'N') use_yn, 
+			CASE WHEN A.opt_gb = 'C' THEN IFNULL(A.stock_opt_price, 0) ELSE IFNULL(G.opt_price, 0) END stock_opt_price, 
+			IFNULL(A.eos_yn, 'N') eos_yn,
+			IFNULL(H.alram_cnt, 0) alram_cnt
+		FROM 
+			wt_product_stock A 
+				LEFT JOIN wt_product_opt2 C ON A.PRODUCT_CD = C.PRODUCT_CD AND A.OPT_VAL1 = C.OPT_CD2 AND A.OPT_GB = 'C'
+				LEFT JOIN wt_product_opt2 D ON A.PRODUCT_CD = D.PRODUCT_CD AND A.OPT_VAL2 = D.OPT_CD2 AND A.OPT_GB = 'C'
+				LEFT JOIN wt_product_opt2 E ON A.PRODUCT_CD = E.PRODUCT_CD AND A.OPT_VAL3 = E.OPT_CD2 AND A.OPT_GB = 'C'
+				LEFT JOIN wt_product_opt1 F ON A.PRODUCT_CD = F.PRODUCT_CD AND A.OPT_CD1 = F.OPT_CD1
+				LEFT JOIN wt_product_opt2 G ON A.PRODUCT_CD = G.PRODUCT_CD AND A.OPT_CD1 = G.OPT_CD1 AND A.OPT_GB <![CDATA[ <> ]]> 'C' AND A.OPT_CD2 = G.OPT_CD2
+				LEFT JOIN (SELECT STOCK_SEQ, COUNT(*) ALRAM_CNT
+						   FROM wt_product_alram
+						  GROUP BY STOCK_SEQ
+						) H ON A.STOCK_SEQ = H.STOCK_SEQ
+		 WHERE A.PRODUCT_CD = #{product_cd}
+		   AND A.USE_YN = 'Y'
+		ORDER BY 
+			CASE A.OPT_GB WHEN 'C' THEN 1 WHEN 'S' THEN 2 WHEN 'I' THEN 3 ELSE 9 END, 
+			A.OPT_VAL1, C.OD, D.OD, E.OD, F.OPT_CD1, G.OD, A.STOCK_SEQ	
+	</select>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<!-- ################################################################ -->
+	<!-- 20221208 부터 시작 -->
+
+	<!--
+	/**
+     * 상품 옵션1 리스트 불러오기
+     * @return [type] [description]
+     */
+	-->
+	<select id="get_product_option1_list">
+		SELECT *
+			, (SELECT product_nm FROM wt_product WHERE product_cd = wt_product_opt1.product_cd ) AS product_base_name
+			, (SELECT sale_price FROM wt_product WHERE product_cd = wt_product_opt1.product_cd ) AS product_base_price
+		FROM wt_product_opt1
+		WHERE del_yn='N' AND use_yn = 'Y'
+		AND product_cd = #{product_cd}
+		<if test="opt_gb != ''">
+			AND opt_gb = #{opt_gb}
+		</if>
+		ORDER BY opt_cd1
+	</select>
+
+
+	<!--
+	/**
+     * 상품 옵션2 리스트 불러오기
+     * @param  [type] $option_data [description]
+     * @return [type]               [description]
+     */
+	 -->
+	<select id="get_product_option2_list">
+		SELECT
+			tb1.*, tb2.soldout_yn, tb2.eos_yn, 
+			ifnull(sum(tb2.stock),1) as stock, 
+			ifnull(tb2.limit_cnt,0) as limit_cnt, 
+			tb2.restock_date, tb2.stock_seq
+			, (select opt_nm1 from wt_product_opt1 where opt_cd1 = tb1.opt_cd1 and product_cd = tb1.product_cd) as opt_nm1
+			,(select opt_gb from wt_product_opt1 where opt_cd1 = tb1.opt_cd1 and product_cd = tb1.product_cd) as opt_gb
+		FROM wt_product_opt2   tb1
+			LEFT JOIN wt_product_stock tb2 ON tb2.product_cd = tb1.product_cd  AND tb2.use_yn = 'Y'
+			/* AND tb2.opt_val1 = tb1.opt_cd2 조합옵션은 따로 stock_seq를 부르므로 해당 소스는 x */
+			<if test="opt_gb != 'C'">
+				AND tb2.opt_cd2 = tb1.opt_cd2
+			</if>
+			<if test="opt_gb == 'C'">
+				AND ( tb2.opt_val2 = tb1.opt_cd2 OR tb2.opt_val3 = tb1.opt_cd2 )
+			</if>
+		WHERE 
+			1=1 AND tb1.del_yn='N'
+			AND tb1.use_yn = 'Y' AND tb1.del_yn='N'
+			/* <if test="opt_gb != 'C'">
+				AND tb2.use_yn = 'Y'
+			</if> */
+			AND tb1.product_cd = #{product_cd}
+			 AND tb1.opt_cd1 = #{opt_cd1}
+		 GROUP BY tb1.opt_cd2
+		 ORDER BY tb1.od asc, tb1.opt_nm2, tb1.opt_cd2
+	</select>
+
+
+	<!--
+	/**
+     * 쇼핑홈 리스트 count 불러오기
+     * @param  [type] $arrays [description]
+     */
+	-->
+	<select id="get_shop_total">
+		SELECT count(*) as count
+		FROM wt_group_product tb1
+			LEFT JOIN wt_product tb2 ON tb2.product_cd = tb1.product_cd
+		WHERE 1=1
+			<if test="sh_category1_cd != null && sh_category1_cd != ''">
+				and tb1.category1_cd = #{sh_category1_cd}
+			</if>
+			<if test="sh_category2_cd != null && sh_category2_cd != ''">
+				and tb1.sh_category2_cd = #{sh_category2_cd}
+			</if>
+			<if test="sh_category3_cd != null && sh_category3_cd != ''">
+				and tb1.sh_category3_cd = #{sh_category3_cd}
+			</if>
+			<if test="sh_stock_yn == 'Y'">
+				 and tb2.product_cd in ( select product_cd from wt_product_stock where product_cd = tb2.product_cd and soldout_yn = 'N' ) and tb2.product_state not in('4', '3')
+			</if>
+			AND tb1.use_yn = 'Y'
+			AND tb1.group_cd = #{group_cd}
+			AND tb2.product_type = 'N'
+			AND tb2.product_state not in ('1','3')
+			AND tb2.del_yn ='N'  AND tb2.hidden_yn='Y'
+	</select>
+
+
+
+	<!--
+	/**
+     * 쇼핑홈 리스트 불러오기
+     * @param  [type] $arrays    [description]
+     * @param  [type] $row_count [description]
+     * @param  [type] $start_num [description]
+     */
+	-->
+	<select id="get_shop_list">
+		SELECT tb2.product_cd, tb2.product_nm, tb2.product_state, tb2.supply_price, tb2.sale_price, tb2.discount_gb, tb2.fee_rate, tb2.product_cd, tb2.icon
+			/* , tb2.review_cnt */
+			, CASE WHEN tb2.group_yn = 'Y' then
+						( SELECT COUNT(*) FROM wt_use_review WHERE product_cd IN ( SELECT set_product_cd FROM wt_product_set WHERE product_cd = tb2.product_cd ) AND use_yn = 'Y' )
+						ELSE
+						( SELECT COUNT(*) FROM wt_use_review WHERE product_cd = tb2.product_cd AND use_yn = 'Y' )
+					  END AS review_cnt
+			, tb2.group_yn
+			, tb2.point as review_avg_point
+			, ifnull((select sum(stock) from wt_product_stock where product_cd = tb2.product_cd),0) as stock_sum_cnt
+			<if test="cust_seq != null">
+				, CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = tb1.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on
+			</if>
+			<if test="cust_seq == null">
+			    , 'N' wish_click_on
+			</if>
+			, (SELECT IFNULL( ROUND(AVG(POINT),2),0) FROM wt_use_review WHERE product_cd = tb1.product_cd ) as point
+			, (SELECT COUNT(*) FROM wt_use_review WHERE product_cd = tb1.product_cd ) as comment_count
+			, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb1.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+			FROM wt_group_product tb1
+			LEFT JOIN wt_product tb2
+			ON tb2.product_cd = tb1.product_cd
+			WHERE 1=1
+			<if test="sh_category1_cd != null && sh_category1_cd != ''">
+				and tb1.category1_cd = #{sh_category1_cd}
+			</if>
+			<if test="sh_category2_cd != null && sh_category2_cd != ''">
+				and tb1.sh_category2_cd = #{sh_category2_cd}
+			</if>
+			<if test="sh_category3_cd != null && sh_category3_cd != ''">
+				and tb1.sh_category3_cd = #{sh_category3_cd}
+			</if>
+			<if test="sh_stock_yn == 'Y'">
+				 and tb2.product_cd in ( select product_cd from wt_product_stock where product_cd = tb2.product_cd and soldout_yn = 'N' ) and tb2.product_state not in('4', '3')
+			</if>
+			AND tb1.use_yn = 'Y'
+			AND tb1.group_cd = #{group_cd}
+			AND tb2.product_type = 'N'
+			AND tb2.product_state not in ('1','3')
+			AND tb2.del_yn ='N'
+			AND tb2.hidden_yn='Y'
+			<if test="sh_order_by == null || sh_order_by == ''">
+				<if test="group_cd == '1002'">
+					ORDER BY FIELD(product_state, '2', '4'), tb2.hits DESC
+				</if>
+				<if test="group_cd != '1002'">
+					ORDER BY FIELD(product_state, '2', '4'), tb2.reg_date DESC, tb2.mod_date DESC
+				</if>
+			</if>
+			<if test="sh_order_by != null && sh_order_by != ''">
+				<if test="sh_order_by == 'A'"> ORDER BY FIELD(product_state, '2', '4'), tb2.reg_date DESC		</if>
+				<if test="sh_order_by == 'B'"> ORDER BY tb2.sale_price ASC		</if>
+				<if test="sh_order_by == 'C'"> ORDER BY tb2.sale_price DESC 	</if>
+				<if test="sh_order_by == 'D'"> ORDER BY tb2.hits DESC		</if>
+				<if test="sh_order_by == 'E'"> ORDER BY tb2.review_cnt DESC		</if>
+				<if test="sh_order_by == 'F'"> ORDER BY review_avg_point desc		</if>
+				<if test="sh_order_by == 'G'"> ORDER BY tb2.product_nm desc		</if>
+				<if test="sh_order_by == 'H'"> ORDER BY tb2.fee_rate desc		</if>
+				<if test="sh_order_by == 'I'"> ORDER BY tb2.order_cnt desc		</if>
+			</if>
+
+			<if test="start_num >= 0 && row_count >= 0">
+				LIMIT ${start_num}, ${row_count}
+			</if>
+	</select>
+
+	<!-- ################################################################ -->
+
+    <select id="get_product_option_file">
+        SELECT 
+            file_nm from wt_product_file 
+        WHERE product_cd = #{product_cd}
+        <if test="opt_cd2 != ''">
+            AND opt_cd2 = #{opt_cd2}
+        </if>
+        AND file_gb = #{file_gb}
+        ORDER BY od ASC, product_file_seq ASC 
+        <if test="page != 'view'">
+            LIMIT 2
+        </if>
+    </select>
+
+    <select id="get_product_color">
+        SELECT tb2.*, opt2.opt_cd2
+            , ( SELECT file_nm FROM wt_product_file WHERE product_cd = opt2.product_cd AND opt_cd2 = opt2.opt_cd2 AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS color_file_nm
+        FROM wt_product_opt2 opt2
+        JOIN wt_code2 tb2 ON opt2.opt_color = tb2.code_cd2 
+        WHERE opt2.product_cd = #{product_cd}
+        AND opt2.opt_cd1 = ( SELECT opt_cd1 FROM wt_product_opt1 tb1
+                                        WHERE tb1.product_cd = #{product_cd}
+                                        AND tb1.color_yn = 'Y'
+                                        ORDER BY tb1.opt_cd1
+                                        LIMIT 1 )
+        ORDER BY opt2.od
+    </select>
+
+
+		<select id="get_product_alram_list">
+			SELECT tb1.*, tb2.*
+				, ( SELECT opt_nm1 FROM wt_product_opt1 WHERE del_yn='N' AND opt_cd1 = ( SELECT opt_cd1 FROM wt_product_opt2 WHERE opt_cd2 = tb1.opt_val1 AND product_cd = tb1.product_cd ) AND product_cd = tb1.product_cd ) AS opt_nm1_1
+				, ( SELECT opt_nm2 FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb1.opt_val1 AND product_cd = tb1.product_cd ) AS opt_nm2_1
+				, ( SELECT opt_nm1 FROM wt_product_opt1 WHERE del_yn='N' AND opt_cd1 = ( SELECT opt_cd1 FROM wt_product_opt2 WHERE opt_cd2 = tb1.opt_val2 AND product_cd = tb1.product_cd ) AND product_cd = tb1.product_cd ) AS opt_nm1_2
+				, ( SELECT opt_nm2 FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb1.opt_val2 AND product_cd = tb1.product_cd ) AS opt_nm2_2
+				, ( SELECT opt_nm1 FROM wt_product_opt1 WHERE del_yn='N' AND opt_cd1 = ( SELECT opt_cd1 FROM wt_product_opt2 WHERE opt_cd2 = tb1.opt_val3 AND product_cd = tb1.product_cd ) AND product_cd = tb1.product_cd ) AS opt_nm1_3
+				, ( SELECT opt_nm2 FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb1.opt_val3 AND product_cd = tb1.product_cd ) AS opt_nm2_3
+				, ( SELECT opt_nm1 FROM wt_product_opt1 WHERE del_yn='N' AND opt_cd1 = tb1.opt_cd1 AND product_cd = tb1.product_cd ) AS opt_nm1_4
+				, ( SELECT opt_nm2 FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb1.opt_cd2 AND product_cd = tb1.product_cd ) AS opt_nm2_4
+				, ( SELECT opt_price FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb1.opt_val1 AND product_cd = tb1.product_cd ) AS price1
+								, ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img
+				, ( SELECT opt_price FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb1.opt_val1 AND product_cd = tb1.product_cd ) AS price1
+				, ( SELECT opt_price FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb1.opt_val2 AND product_cd = tb1.product_cd ) AS price2  
+				, ( SELECT opt_price FROM wt_product_opt2 WHERE del_yn='N' AND opt_cd2 = tb1.opt_val3 AND product_cd = tb1.product_cd ) AS price3 
+			FROM wt_product_stock tb1
+			INNER JOIN wt_product tb2 ON tb2.product_cd = tb1.product_cd
+			WHERE tb1.product_cd = #{product_cd} AND ( tb1.opt_gb='C' OR tb1.opt_gb='S' )
+			AND soldout_yn = 'Y' AND tb1.use_yn='Y' AND tb1.eos_yn= 'N'
+		</select>
+
+
+
+	<select id="get_addition_product_list">
+		SELECT tb1.*
+					, tb2.product_nm AS addition_product_nm
+					, tb2.product_type AS addition_product_type
+					, tb2.main_img AS addition_main_img
+					, tb2.fee_rate AS addition_fee_rate
+					, tb2.reserve_rate AS addition_reserve_rate
+					, tb2.supply_price AS addition_supply_price
+					, tb2.sale_price AS addition_sale_price
+		FROM wt_product_addition tb1
+		LEFT JOIN wt_product tb2 ON tb2.product_cd = tb1.addition_product_cd AND del_yn = 'N'
+		WHERE tb1.product_cd = #{product_cd}
+	</select>
+
+
+
+
+	<select id="exists_restock">
+		SELECT count(*) as cnt 
+		FROM wt_product_alram 
+		WHERE cust_seq = #{cust_seq} 
+			AND product_cd = #{product_cd}
+			AND stock_seq = #{stock_seq} 
+			AND alram_yn = 'N'
+	</select>
+
+
+
+
+	<select id="insert_restock">
+		INSERT INTO wt_product_alram ( cust_seq, user_id, user_nm, hp, email, product_cd, stock_seq, alram_yn, reg_date )
+		VALUES(#{cust_seq}, #{user_id}, #{user_nm}, #{hp}, #{email}, #{product_cd}, #{stock_seq}, 'N', NOW())
+	</select>
+
+
+
+	<select id='get_review_photo'>
+		SELECT
+			*
+			,( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq ) AS like_cnt
+			,( SELECT COUNT(*) FROM wt_like_info WHERE sort ='product_review' AND ref_seq = wt_use_review.use_review_seq AND cust_seq = #{cust_seq} ) AS like_yn
+		FROM
+			wt_use_review
+		WHERE
+			product_cd = #{product_cd} AND review_gb = 'P' AND use_yn = 'Y'
+		ORDER BY
+			like_cnt DESC, use_review_seq DESC
+		LIMIT 6
+	</select>
+	
+
+
+
+	<select id="individual_banner">
+		SELECT
+			file_nm1, file_nm2, link, link_gb, content_text1, content_text2
+		FROM
+			wt_banner
+        WHERE
+			banner_cd = '115'
+				AND display_Sdate <![CDATA[ < ]]> NOW()
+				AND display_Edate <![CDATA[ > ]]> NOW()
+				AND use_yn ='Y'
+			AND	product_cd = #{product_cd}
+		ORDER BY
+			reg_date DESC
+		LIMIT 1
+	</select>
+
+
+
+
+	<select id="get_category">
+		SELECT
+			*
+		FROM
+			wt_product_category
+		WHERE
+			product_cd = #{product_cd}
+		ORDER BY
+			product_category_seq ${mode}
+		LIMIT 1
+	</select>
+
+
+
+
+
+	<select id="common_cate_banner">
+		SELECT
+			file_nm1, file_nm2, link, link_gb, content_text1, content_text2
+		FROM
+			wt_banner
+        WHERE
+			banner_cd = '115'
+				AND display_Sdate <![CDATA[ < ]]> NOW()
+				AND display_Edate <![CDATA[ > ]]> NOW()
+				AND use_yn ='Y'
+				${category1}
+				${category2}
+				${category3}
+			ORDER BY
+				reg_date DESC
+			LIMIT 1
+	</select>
+
+
+
+	<select id="common_banner">
+		SELECT
+			file_nm1, file_nm2, link, link_gb, content_text1, content_text2
+		FROM
+			wt_banner
+        WHERE
+			banner_cd = '115'
+            AND display_Sdate <![CDATA[ < ]]> NOW()
+            AND display_Edate <![CDATA[ > ]]> NOW()
+            AND use_yn ='Y'
+			AND category1_cd = ''
+			AND category2_cd = ''
+			AND category3_cd = ''
+			AND product_cd = ''
+		ORDER BY
+			od asc, reg_date DESC
+	</select>
+
+	<select id="ProductDetail_New">
+
+SELECT product_cd, product_state,
+       group_yn, group_cd, product_nm, product_etc_nm, product_deal_nm, 
+       product_nm_eng, product_stock, coupon_use_yn, 
+       reserve_use_yn, reserve_give_yn, supply_price, sale_price, fee_rate, 
+       reserve_rate, keywd, product_content, icon,
+       free_trans_yn, discount_gb, product_relation_yn, 
+       best_product_display, best_review_display, write_use_yn, write_title, 
+       order_limit_cnt, order_mini_quantiry, shipping_yn, shipping_gudie, return_yn, 
+       return_guide, exchange_yn, exchange_guide, vw_cnt, 
+       hits, review_cnt, order_cnt, del_yn, reg_date, 
+       point, review_pt_yn, hidden_yn
+  FROM wt_product
+ WHERE product_cd = #{product_cd};
+
+SELECT addition_product_cd
+  FROM wt_product_addition
+ WHERE product_cd = #{product_cd};
+
+SELECT A.category1_cd, A.category2_cd, A.category3_cd,
+       B.category_nm category1_nm, B.category_nm category2_nm, C.category_nm category3_nm
+  FROM wt_product_category A LEFT JOIN wt_category B on A.category1_cd = B.category_cd
+                             LEFT JOIN wt_category C on A.category2_cd = C.category_cd
+                             LEFT JOIN wt_category D on A.category3_cd = D.category_cd
+ WHERE product_cd = #{product_cd};
+
+SELECT content2, content3, content4
+  FROM wt_product_con;
+
+SELECT product_cd, product_info_title, product_info, product_info_content, product_color, 
+       product_use_age, product_make_country, product_make_company, product_import, product_launch_year, 
+	   product_material, product_nc_cert, product_as_inquire, product_guaranty, product_laundry, 
+	   product_npncode, kfda_check, ingredient, content, content_eng, 
+	   content_mb, product_component_editor, product_component_yn, product_content_yn, reg_date, 
+	   product_component_view_yn
+  FROM wt_product_detail pd
+ WHERE product_cd = #{product_cd};
+
+SELECT product_file_seq, opt_cd2, file_gb, file_nm, od 
+  FROM wt_product_file pf
+WHERE product_cd = #{product_cd}
+ ORDER BY od asc;
+
+SELECT relation_product_cd
+  FROM wt_product_relation
+ WHERE product_cd = #{product_cd};
+
+SELECT opt_gb,
+       CASE opt_gb WHEN 'I' THEN '추가' WHEN 'C' THEN '조합' WHEN 'S' THEN '개별' END opt_gbnm,
+       opt_cd1, opt_nm1, mandatory_yn, color_yn
+  FROM wt_product_opt1
+ WHERE product_cd = #{product_cd}
+   AND use_yn = 'Y'
+   AND del_yn = 'N'
+ ORDER BY opt_od;
+
+SELECT A.stock_seq, A.opt_gb, CASE A.opt_gb WHEN 'I' THEN '추가' WHEN 'C' THEN '조합' WHEN 'S' THEN '개별' END opt_gbnm,
+       A.opt_val1, C.opt_nm2 opt_val1_nm,
+       A.opt_val2, D.opt_nm2 opt_val2_nm,
+       A.opt_val3, E.opt_nm2 opt_val3_nm,
+       A.opt_cd1, F.opt_nm1 opt_val_nm1, A.opt_cd2, G.opt_nm2 opt_val_nm2,
+       IFNULL(A.stock, 0) stock,
+       IFNULL(A.limit_cnt, 0) limit_cnt,
+       IFNULL(A.soldout_yn, 'N') soldout_yn,
+       DATE_FORMAT(A.restock_date, '%Y-%m-%d') restock_date,
+       IFNULL(A.use_yn, 'N') use_yn,
+       CASE WHEN A.opt_gb = 'C' THEN IFNULL(A.stock_opt_price, 0) ELSE IFNULL(G.opt_price, 0) END stock_opt_price,
+       IFNULL(A.eos_yn, 'N') eos_yn,
+       IFNULL(H.alram_cnt, 0) alram_cnt
+  FROM wt_product_stock A LEFT JOIN wt_product_opt2 C ON A.PRODUCT_CD = C.PRODUCT_CD AND A.OPT_VAL1 = C.OPT_CD2 AND A.OPT_GB = 'C'
+                          LEFT JOIN wt_product_opt2 D ON A.PRODUCT_CD = D.PRODUCT_CD AND A.OPT_VAL2 = D.OPT_CD2 AND A.OPT_GB = 'C'
+                          LEFT JOIN wt_product_opt2 E ON A.PRODUCT_CD = E.PRODUCT_CD AND A.OPT_VAL3 = E.OPT_CD2 AND A.OPT_GB = 'C'
+                          LEFT JOIN wt_product_opt1 F ON A.PRODUCT_CD = F.PRODUCT_CD AND A.OPT_CD1 = F.OPT_CD1
+                          LEFT JOIN wt_product_opt2 G ON A.PRODUCT_CD = G.PRODUCT_CD AND A.OPT_CD1 = G.OPT_CD1 AND A.OPT_GB <![CDATA[ <> ]]> 'C' AND A.OPT_CD2 = G.OPT_CD2
+                          LEFT JOIN (SELECT STOCK_SEQ, COUNT(*) ALRAM_CNT
+                                       FROM wt_product_alram
+                                      GROUP BY STOCK_SEQ
+                                    ) H ON A.STOCK_SEQ = H.STOCK_SEQ
+ WHERE A.product_cd = #{product_cd}
+   AND A.use_yn = 'Y'
+ ORDER BY CASE A.OPT_GB WHEN 'C' THEN 1 WHEN 'S' THEN 2 WHEN 'I' THEN 3 ELSE 9 END,
+          A.OPT_VAL1, C.OD, D.OD, E.OD, F.OPT_CD1, G.OD, A.STOCK_SEQ;
+
+SELECT A.use_review_seq, A.cust_seq, A.user_id, A.user_nm, A.reg_date, A.title, A.content, A.review_gb, A.point,
+       A.file_nm1, A.file_nm2, A.file_nm3, A.file_nm4, A.file_nm5,
+       A.photo_review_url, A.photo_review_url2, A.photo_review_url3, A.photo_review_url4, A.photo_review_url5, 
+       A.photo_review_url6,
+       A.reserved_yn,
+       IFNULL(B.comment_cnt, 0) comment_cnt,
+       IFNULL(C.like_cnt, 0) like_cnt,
+       IFNULL(C.this_like_cnt, 0) like_yn
+FROM wt_use_review A LEFT JOIN (SELECT use_review_seq, COUNT(*) comment_cnt
+									FROM wt_use_review_comment
+								WHERE use_yn = 'Y'
+								GROUP BY use_review_seq
+							   ) B ON A.use_review_seq = B.use_review_seq
+						LEFT JOIN (SELECT ref_seq, 
+										COUNT(*) like_cnt,
+<if test="cust_seq != null and cust_seq != ''">
+										SUM(CASE WHEN cust_seq = #{cust_seq} THEN 1 ELSE 0 END) this_like_cnt
+</if>
+
+<if test="cust_seq == || and cust_seq == ''">
+										0 this_like_cnt
+</if>
+									FROM wt_like_info
+								WHERE sort='review'
+									AND gubun ='L'
+								GROUP BY ref_seq
+								) C ON A.use_review_seq = C.ref_seq  
+WHERE 1=1
+	and A.product_cd = #{product_cd}
+ORDER BY A.reg_date, A.use_review_seq;
+
+SELECT B.comment_seq, B.use_review_seq, B.user_id, B.user_nm, B.comment, B.reg_date
+	FROM wt_use_review A INNER JOIN wt_use_review_comment B ON A.use_review_seq = B.use_review_seq
+	WHERE A.product_cd = #{product_cd}
+	AND B.use_yn = 'Y'
+	ORDER BY A.reg_date, A.use_review_seq, B.reg_date;
+
+SELECT A.no, B.code_nm2, A.public_yn, A.cust_seq, 
+<if test="cust_seq != null and cust_seq != ''">
+       CASE WHEN A.cust_seq = #{cust_seq} THEN 'Y' ELSE 'N' END writer_yn, 
+</if>
+<if test="cust_seq == || and cust_seq == ''">
+       'N' writer_yn, 
+</if>
+       A.writer_id, A.reg_date, A.content, 
+       CASE WHEN IFNULL(A.reply_content, '') = '' THEN 'N' ELSE 'Y' END reply_yn,
+       A.reply_content
+  FROM wt_board A INNER JOIN wt_code2 B ON A.code_gb = B.code_cd2
+ WHERE A.product_cd = '5121395'
+   AND A.sort = 'counsel'
+   AND A.del  = 'N'
+   AND A.show  = 'Y'
+ ORDER BY A.reg_date
+
+	</select>
+
+
+
+
+	<select id="common_buy_guide">
+		SELECT
+			content
+		FROM
+			wt_product_guide
+        WHERE
+            use_yn ='Y' AND del_yn='N'
+			<if test="mode == 'no-cate'">
+				AND category1_cd = ''
+				AND category2_cd = ''
+				AND category3_cd = ''
+			</if>
+			<if test="mode == ''">
+				${category1}
+				${category2}
+				${category3}
+			</if>
+		ORDER BY
+			reg_date DESC
+		LIMIT 1
+	</select>
+
+
+
+	<select id="get_product_cate_banner">
+		SELECT
+			* 
+		FROM
+			wt_banner 
+		WHERE
+			banner_cd = '112' 
+			AND display_Sdate <![CDATA[<]]> NOW() AND display_Edate <![CDATA[>]]> NOW() 
+			AND use_yn = 'Y' 
+			AND category1_cd = #{category1_cd}
+			AND category2_cd = #{category2_cd}
+			AND category3_cd = #{category3_cd}
+	</select>
+
+
+
+	<select id="get_category_list">
+		SELECT   
+			tb1.*
+			, (SELECT category_nm FROM wt_category WHERE category_cd = #{category2_cd}) as category2_nm
+			, (SELECT category_nm FROM wt_category WHERE category_cd = #{category3_cd}) as category3_nm
+		FROM wt_category tb1
+		WHERE 1=1 
+			AND category_cd = #{category1_cd}
+	</select>
+
+
+
+
+
+<select id="get_category_list2">
+	SELECT
+		* 
+	FROM
+		wt_category 
+	WHERE
+		use_yn = 'Y' 
+		AND category_m_cd = #{category1_cd}
+	ORDER BY
+		od
+</select>
+
+
+
+
+
+<select id="get_category_list3">
+	SELECT
+		* 
+	FROM
+		wt_category 
+	WHERE
+		use_yn = 'Y' 
+		AND category_m_cd = #{category2_cd}
+	ORDER BY
+		od
+</select>
+
+
+
+
+<select id="get_best_group_list">
+	SELECT
+		tb2.product_cd,
+		tb2.product_nm,
+		tb2.product_state,
+		tb2.supply_price,
+		tb2.sale_price,
+		tb2.discount_gb,
+		tb2.fee_rate,
+		tb2.product_cd,
+		tb2.icon,
+		( SELECT file_nm FROM wt_product_file WHERE product_cd = tb1.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img,
+		<if test="cust_seq != null">
+			CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = tb2.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on
+		</if>
+		<if test="cust_seq == null">
+			'N' wish_click_on
+		</if>
+	FROM
+		wt_group_product tb1
+		LEFT JOIN wt_product tb2 ON tb1.product_cd = tb2.product_cd 
+	WHERE
+		tb1.group_cd = '2001'
+		<if test="category1_cd">
+			AND tb1.product_cd in (SELECT product_cd FROM wt_product_category WHERE category1_cd = #{category1_cd})		
+		</if>
+		<if test="category2_cd">
+			AND tb1.product_cd in (SELECT product_cd FROM wt_product_category WHERE category2_cd = #{category2_cd})		
+		</if>
+		<if test="category3_cd">
+			AND tb1.product_cd in (SELECT product_cd FROM wt_product_category WHERE category2_cd = #{category3_cd})		
+		</if>
+</select>
+
+
+<select id="getCategoryList">
+	SELECT tb1.* FROM wt_category AS tb1 WHERE ISNULL(category_m_cd) AND tb1.use_yn = "Y" ORDER BY od ASC
+</select>
+
+
+<select id="getCategoryList2">
+	SELECT * FROM wt_category WHERE use_yn = "Y" AND category_m_cd = ${cate_cd} ORDER BY od
+</select>
+
+
+<select id="getCategoryList3">
+	SELECT * FROM wt_category WHERE use_yn = "Y" AND category_m_cd = ${cate2_cd} ORDER BY od
+</select>
+
+
+</mapper>

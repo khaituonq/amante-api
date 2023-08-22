@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="style">
+    <select id="get_manager_all_styles">
+        SELECT * FROM vn_room_div_h WHERE del_yn = 'N'
+    </select>
+
+    <select id="get_manager_all_detailed">
+        SELECT * FROM vn_room_div_d WHERE del_yn = 'N' AND h_code = #{h_code}
+    </select>
+
+    <select id="get_manager_style">
+        SELECT * FROM vn_room_div_h WHERE del_yn = 'N' AND h_code = #{h_code}
+    </select>
+
+    <select id="get_manager_detailed">
+        SELECT * FROM vn_room_div_d WHERE del_yn = 'N' AND h_code = #{h_code} AND d_code = #{d_code}
+    </select>
+
+
+    <update id="update_style">
+        UPDATE vn_room_div_h
+        SET
+            h_name = #{h_name},
+            file_nm_enb = #{file_nm_enb},
+            file_nm_dis = #{file_nm_enb},
+            use_yn =  #{use_yn},
+            del_yn = #{del_yn}
+        WHERE h_code = #{h_code}
+    </update>
+
+    <update id="update_detailed">
+        UPDATE vn_room_div_d
+        SET
+            d_name = #{d_name},
+            use_yn = #{use_yn},
+            del_yn = #{del_yn}
+        WHERE
+            h_code = #{h_code} AND d_code = #{d_code}
+    </update>
+
+    <insert id="insert_detail">
+        INSERT INTO vn_room_div_d
+        SET
+            h_code = ${h_code},
+            d_code = (SELECT*FROM( SELECT IFNULL( max( d_code ), 0 ) + 1 FROM vn_room_div_d WHERE h_code = ${h_code}) d_code ),
+            d_name = #{d_name},
+            use_yn = #{use_yn},
+            del_yn = #{del_yn}
+    </insert>
+
+    <insert id="insert_style">
+        INSERT INTO
+            vn_room_div_h
+        SET
+            h_name = #{h_name},
+            file_nm_enb = #{file_nm_enb},
+            file_nm_dis = #{file_nm_dis},
+            use_yn = #{use_yn},
+            del_yn = #{del_yn}
+    </insert>
+</mapper>

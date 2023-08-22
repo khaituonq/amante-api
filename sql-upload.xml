@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//reviewEN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="upload">
+    <insert id="insert_upload">
+        INSERT INTO vn_upload
+        SET ip = #{hostname}, username = #{username}, password = #{password}, port = #{port} 
+        ON DUPLICATE KEY UPDATE timestamp = #{timestamp}
+    </upload>
+</mapper>

@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="member">
+	<!-- sample -->
+	<select id="testBasic">
+		SELECT now()
+	</select>
+
+
+	<select id="login">
+		SELECT cust_seq, user_id, user_nm, email, phone, pass_change_date, member_grp_cd FROM wt_member WHERE user_id = #{user_id} AND passwd = #{passwd} and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+
+	<select id="findId">
+		SELECT cust_seq, user_id, user_nm, email, pass_change_date FROM wt_member WHERE user_id = #{user_id} AND user_nm = #{user_nm} AND email = #{email} and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+	<select id="findIdPhone">
+		SELECT cust_seq, user_id, user_nm, email, pass_change_date FROM wt_member WHERE user_id = #{user_id} AND user_nm = #{user_nm} AND REPLACE(phone,'-','') = REPLACE(#{phone},'-','') and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+
+	
+	<!-- <select id="memberSInfo">
+		SELECT cust_seq, user_id, user_nm, email, pass_change_date FROM wt_member WHERE cust_seq = #{cust_seq} and ifnull(out_yn, 'N') = 'N'
+	</select> -->
+	<select id="memberSInfo">
+		SELECT tb1.cust_seq, tb1.user_id, tb1.user_nm, tb1.email, tb1.pass_change_date ,tb1.birthday,tb1.phone
+			, tb2.mem_addr_seq 
+			,(SELECT member_gb FROM wt_member_sns_info WHERE cust_seq=tb1.cust_seq LIMIT 1) AS member_gb
+			,(SELECT member_grp_nm FROM wt_member_grp WHERE member_grp_cd = tb1.member_grp_cd ) AS member_grp_nm
+			,(
+			SELECT
+				wt_coupon.title 
+			FROM
+				wt_coupon_member 
+				LEFT JOIN wt_coupon ON wt_coupon_member.coupon_seq = wt_coupon.coupon_seq 
+				WHERE
+				wt_coupon_member.cust_seq = tb1.cust_seq
+			ORDER BY
+				cust_seq DESC 
+				LIMIT 1
+			) AS coupon_title
+        FROM wt_member tb1
+			LEFT JOIN wt_member_addr tb2 ON tb2.cust_seq = tb1.cust_seq AND tb2.default_yn = 'Y'
+		WHERE tb1.cust_seq = #{cust_seq}
+		and ifnull(tb1.out_yn, 'N') = 'N'
+	</select>
+
+
+	<insert id="log_login">
+		insert into wt_login_history(login_gb, login_id, login_nm, login_sdate, reg_ip, user_agent) 
+		values(#{login_gb}, #{login_id}, #{login_nm}, now(), #{reg_ip}, #{user_agent} ) 
+	</insert>
+
+
+	<insert id="create_temporary">
+		CREATE TEMPORARY TABLE wt_login_tem(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			url varchar(250)
+		);
+
+		insert into wt_login_tem(url) 
+		values(#{url} ) 
+	</insert>
+
+	<select id="get_temporary">
+		SELECT * FROM wt_login_tem 
+	</select>
+	
+	<select id="detete_temporary">
+		DROP TABLE wt_login_tem;
+	</select>
+
+	<select id="memberInfo">
+		SELECT * FROM wt_member WHERE user_id = #{user_id} and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+	<select id="idCheck">
+		SELECT count(cust_seq) cnt FROM wt_member WHERE user_id = #{user_id} and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+
+
+	<update id="updateMemberPass">
+		UPDATE wt_member
+		SET
+			passwd = #{passwd}, pass_change_date = now()
+		WHERE
+			cust_seq = ${cust_seq}
+	</update>
+
+	
+
+	<select id="findMember">
+		SELECT cust_seq, user_id, user_nm, email, pass_change_date FROM wt_member WHERE user_id = #{user_id} AND email = #{email} and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+
+	<select id="checkMember">
+		SELECT cust_seq, user_id, user_nm, email 
+		FROM wt_member 
+		WHERE ( user_id = #{user_id} or email = #{email} ) and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+
+
+
+
+
+
+
+	
+	<select id="idCheckP">
+		SELECT COUNT(*) AS count
+		FROM wt_member tb1
+		WHERE tb1.user_id = #{user_id}
+		AND (
+				(tb1.out_yn = 'Y' AND (SELECT COUNT(*) FROM wt_order_info WHERE cust_seq = tb1.cust_seq) >= 0)
+				OR
+				tb1.out_yn = 'N'
+			)
+	</select>
+
+	
+	<select id="emailCheck">
+		SELECT count(cust_seq) cnt FROM wt_member WHERE email = #{email} and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+	
+	<select id="phoneCheck">
+		SELECT count(cust_seq) cnt FROM wt_member WHERE REPLACE(phone,'-','') = REPLACE(#{phone},'-','') and ifnull(out_yn, 'N') = 'N'
+	</select>
+
+	
+
+	<insert id="joinMember">
+		insert into 
+			wt_member(
+				member_grp_cd,
+				user_id,
+				passwd,
+				user_nm,
+				birthday,
+				phone,
+				email,
+				reg_date,
+				mailing_yn,
+				sms_yn,
+				ip,
+				gender,
+				join_path,
+				join_gb
+			) 
+		values(
+				#{member_grp_cd},
+				#{user_id},
+				#{passwd},
+				#{user_nm},
+				#{birthday},
+				#{phone},
+				#{email},
+				now(),
+				#{mailing_yn},
+				#{sms_yn},
+				#{ip},
+				#{gender},
+				#{join_path},
+				#{join_gb}
+		) 
+	</insert>
+
+
+	<insert id="memberJoinCoupon">
+		INSERT INTO wt_coupon_member
+		 ( coupon_master_seq, coupon_seq, cust_seq, user_id, use_yn, s_date, e_date, reg_date,  coupon_number, chk_yn)
+		SELECT tb1.coupon_master_seq, coupon_seq, #{cust_seq}, #{user_id}, 'N', NOW(),
+				CASE WHEN tb2.limite_gb = 0 THEN DATE_FORMAT(date_add(NOW(), INTERVAL tb2.limite_day DAY),'%Y-%m-%d 00:00:00')
+				WHEN tb2.limite_gb = 1 THEN tb1.e_date
+				ELSE tb1.e_date END, NOW()
+		 , (SELECT coupon_number FROM wt_coupon_number WHERE coupon_seq = tb1.coupon_seq AND coupon_master_seq = tb1.coupon_master_seq )
+		 , 'N'
+		FROM wt_coupon tb1, wt_coupon_master tb2
+		WHERE 1=1
+		AND tb1.coupon_master_seq = tb2.coupon_master_seq
+		AND tb1.s_date <![CDATA[ <= ]]> now()
+		AND adddate(tb1.e_date, 1) >= NOW()
+		AND tb2.coupon_member_gb = 1
+		AND tb2.coupon_state = '1'
+	</insert>
+
+
+
+	<update id="leave">
+		UPDATE wt_member
+		SET
+			out_yn = 'Y', out_date = now(),
+			join_gb = NULL,
+            member_grp_cd = NULL,
+            passwd = NULL,
+            pass_change_date = NULL,
+            user_nm = NULL,
+            mb_reserve = NULL,
+            birthday = NULL,
+            phone = NULL,
+            email = NULL,
+            home_zip = NULL,
+            home_addr1 = NULL,
+            home_addr2 = NULL,
+            mod_date = NULL,
+            mailing_yn = NULL,
+            sms_yn = NULL,
+            last_login_date = NULL,
+            join_path = NULL,
+            join_path_text = NULL,
+            reference_id = NULL,
+            ip = NULL,
+            callback_date = NULL,
+            pass_err_cnt = NULL,
+            pass_err_date = NULL,
+            tendecy = NULL
+		WHERE
+			cust_seq = ${cust_seq}
+	</update>
+
+	<delete id="leaveSns">
+		delete from wt_member_sns_info
+		where cust_seq = #{cust_seq}
+	</delete>
+
+
+
+
+    <select id="check_phone_name">
+        SELECT COUNT(*) AS cnt FROM wt_member WHERE user_nm = #{user_nm} AND phone = #{phone}
+    </select>
+    
+    <insert id="cert_insert">
+        INSERT 
+            wt_cert_sms 
+        SET
+            hp = #{hp},
+            cert_num = #{cert_num},
+            ip = #{ip},
+            reg_date = NOW()
+    </insert>
+	<!--
+
+	추가 정보
+	-->
+
+	<update id="setTendecy">
+		/*
+		$update_data = array(
+    		'tendecy' => $data
+    	);
+    	return $this->db->update('wt_member', $update_data, array('cust_seq' => $cust_seq));
+		*/
+	</update>
+
+	<update id="updateBirthDay">
+		update wt_member set birthday = #{birthday} where cust_seq = #{cust_seq}
+	</update>
+
+	<update id="updateGender">
+		update wt_member set gender = #{gender} where cust_seq = #{cust_seq}
+	</update>
+
+
+	<select id="get_mem_info1">
+		 
+	</select>
+
+	<select id="get_mem_info_cart">
+		SELECT *
+			, tb2.mem_addr_seq , tb2.home_zip, tb2.home_addr1, tb2.home_addr2, tb2.delivery_msg
+			,(SELECT member_gb FROM wt_member_sns_info WHERE cust_seq=tb1.cust_seq LIMIT 1) AS member_gb
+			,(SELECT member_grp_nm FROM wt_member_grp WHERE member_grp_cd = tb1.member_grp_cd ) AS member_grp_nm
+			, (YEAR(CURDATE()) - YEAR(tb1.birthday))+1 AS age
+			, SUBSTRING(tb1.phone,1,3) AS phone1
+			, SUBSTRING(tb1.phone,4,4) AS phone2
+			, SUBSTRING(tb1.phone,8,4) AS phone3
+			, SUBSTRING_INDEX(tb1.email,'@',1) AS email_id
+			, SUBSTRING_INDEX(tb1.email,'@',-1) AS email_addr
+        FROM wt_member tb1
+			LEFT JOIN wt_member_addr tb2 ON tb2.cust_seq = tb1.cust_seq AND tb2.default_yn = 'Y'
+		WHERE tb1.cust_seq = #{cust_seq}
+	</select>
+
+	<select id="get_member_grp_info">
+		SELECT * FROM wt_member_grp
+		WHERE member_grp_cd = #{member_grp_cd}
+	</select>
+
+
+	<update id="set_member_update">
+		/* return $this->db->update('wt_member', $array, array('cust_seq' => $cust_seq)); */
+		/*
+		$mem_arrays = ['next_use_otype_cd' => $otype_cd];
+		*/
+		update wt_member
+		set
+			next_use_otype_cd = #{next_use_otype_cd}
+		where
+			cust_seq = #{cust_seq}
+	</update>
+
+	<insert id="set_reserve_insert">
+		/* return $this->connect->insert_single("wt_reserve", $array, false, false); */
+		/*
+		param.cust_seq			= cust_seq;
+		param.user_id			= user_id;
+		param.from_mlg			= array['frommlg'];
+		param.mlg				= array['reserve'];
+		param.new_mlg			= is_newmlg;
+		param.state				= array['state'];
+		param.use_yn			= "Y";
+		param.reference			= array['reference'];
+		param.ocode				= array['ocode'];
+		*/
+		insert into wt_reserve(
+			cust_seq,
+			user_id,
+			from_mlg,
+			mlg,
+			new_mlg,
+			state,
+			use_yn,
+			reference,
+			ocode
+		) values (
+			#{cust_seq},
+			#{user_id},
+			#{from_mlg},
+			#{mlg},
+			#{new_mlg},
+			#{state},
+			#{use_yn},
+			#{reference},
+			#{ocode}
+		)
+	</insert>
+
+	<insert id="set_deposit_insert">
+		/* return $this->connect->insert_single("wt_deposit", $array, false, false); */
+	</insert>
+
+	<select id="getData">
+		SELECT * FROM wt_member WHERE cust_seq = #{cust_seq}
+	</select>
+
+	<!--
+	## sns 인증정보 가져오기
+	-->
+	<select id="get_sns_info">
+		SELECT * FROM wt_member_sns_info WHERE cust_seq = #{cust_seq}
+	</select>
+
+
+	<select id="getSNSInfoFromCustSeq">
+		SELECT
+			sns_seq, member_gb, reg_date, sns_id
+		FROM wt_member_sns_info
+		where cust_seq = #{cust_seq}
+	</select>
+
+	<select id="getSNSInfoFromSeq">
+		SELECT
+			cust_seq
+		FROM wt_member_sns_info
+		where sns_seq = #{sns_seq}
+	</select>
+
+	<delete id="destroySNS">
+		DELETE from wt_member_sns_info where sns_seq = #{sns_seq}
+	</delete>
+
+	<select id="get_mem_info">
+		SELECT *,(SELECT member_gb FROM wt_member_sns_info WHERE cust_seq=wt_member.cust_seq LIMIT 1) AS member_gb FROM wt_member 
+		WHERE cust_seq = #{cust_seq}
+	</select>
+
+	<update id="set_member_update2">
+	/*
+		param.cust_seq			= cust_seq;
+		param.user_id			= user_id;
+		param.from_mlg			= array['frommlg'];
+		param.mlg				= array['reserve'];
+		param.new_mlg			= is_newmlg;
+		param.state				= array['state'];
+		param.use_yn			= "Y";
+		param.reference			= array['reference'];
+		param.ocode				= array['ocode'];
+		mb_reserve
+		*/
+		update wt_member
+		set
+			from_mlg			= #{from_mlg},
+			mlg					= #{mlg},
+			new_mlg				= #{new_mlg},
+			state				= #{state},
+			use_yn				= #{use_yn},
+			reference			= #{reference},
+			ocode				= #{ocode}
+			<if test="mb_reserve != null && mb_reserve != ''">
+				,mb_reserve			= #{mb_reserve}
+			</if>
+			<if test="mb_deposit != null && mb_deposit != ''">
+				,mb_deposit			= #{mb_deposit}
+			</if>
+			
+		where
+			cust_seq = #{cust_seq}
+	</update>
+
+
+	
+	<update id="set_member_update3">
+	/*
+		param.cust_seq			= cust_seq;
+		param.user_id			= user_id;
+		param.from_mlg			= array['frommlg'];
+		param.mlg				= array['reserve'];
+		param.new_mlg			= is_newmlg;
+		param.state				= array['state'];
+		param.use_yn			= "Y";
+		param.reference			= array['reference'];
+		param.ocode				= array['ocode'];
+		mb_reserve
+		*/
+		update wt_member
+		set
+			next_use_otype_cd			= #{next_use_otype_cd}
+		where
+			cust_seq = #{cust_seq}
+	</update>
+
+
+    <update id="cert_update">
+        UPDATE wt_cert_sms SET cert_yn = 'Y', cert_date = NOW() WHERE hp = #{hp} AND cert_num = #{cert_num}
+    </update>
+
+    <select id="cert_num_check">
+        SELECT COUNT(*) AS count FROM wt_cert_sms WHERE hp = #{hp} AND cert_num = #{cert_num}  
+    </select>
+
+    <insert id="insert_wishlist">
+        INSERT INTO 
+            wt_wishlist 
+        SET 
+            cust_seq = #{custseq}, 
+            product_cd = #{product_cd},
+            opt_cd = #{opt_cd},
+            reg_date = NOW()
+    </insert>
+
+    <delete id="remove_wishlist">
+        DELETE FROM wt_wishlist WHERE product_cd = #{product_cd} AND cust_seq = #{custseq}
+    </delete>
+
+	<select id="get_mem_sns_info">
+		SELECT * FROM wt_member_sns_info WHERE sns_id = #{sns_id} and member_gb = #{join_type}
+	</select>
+	<insert id="sns_insert">
+	
+        INSERT INTO 
+            wt_member_sns_info(cust_seq,member_gb,sns_id,sns_email,sns_nm,reg_date)
+        values(
+			#{cust_seq},
+			#{member_gb},
+			#{sns_id},
+			#{sns_email},
+			#{sns_nm},
+			NOW()
+		)
+    </insert>
+
+	<delete id="direct_member_sns_info">
+		DELETE FROM wt_member_sns_info WHERE cust_seq = #{cust_seq}
+		
+	</delete>
+
+</mapper>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="auth">
+    <select id="get_admin_info">
+        SELECT
+        admin_id, admin_pw, admin_nm, phone,
+        admin_gb, acsess_ip, approval_yn, pass_err_cnt,
+        pass_err_date, DATE_FORMAT(pass_change_date,"%Y-%m-%d") as pass_change_date,
+        sms_security_yn, sms_security_num
+        FROM wt_admin WHERE admin_id = #{admin_id}
+    </select>
+
+    <update id="update_login_date">
+        UPDATE wt_admin
+        SET last_login_date = DATE_FORMAT(NOW(),'%Y-%m-%d %H:%m:%s'), pass_err_date = NULL, pass_err_cnt = '0', sms_security_yn = 'Y'
+        WHERE admin_id = #{admin_id}
+    </update>
+
+    <update id="update_login_err">
+        UPDATE wt_admin
+        SET
+            pass_err_cnt = #{pass_err_cnt}
+            <if test="pass_err_date !== '' || pass_err_date !== null">
+                , pass_err_date = #{pass_err_date}
+            </if>
+        WHERE admin_id = #{admin_id}
+    </update>
+
+    <update id="reset_cnt">
+        UPDATE wt_admin SET pass_err_date = '' , pass_err_cnt = '1'  WHERE admin_id = #{admin_id}
+    </update>
+
+
+    <insert id="login_history">
+        INSERT INTO wt_login_history
+        SET
+            login_gb = #{login_gb},
+            login_id = #{login_id},
+            login_nm = #{login_nm},
+            login_sdate = #{login_sdate},
+            reg_ip = #{reg_ip},
+            user_agent = #{user_agent}
+    </insert>
+
+    <insert id="insert_auth_token">
+        INSERT INTO vn_auth_token
+        SET
+            token = #{token},
+            expire_date = #{expire_date},
+            logout_yn = #{logout_yn},
+            logout_time = #{logout_time}
+    </insert>
+
+    <select id="get_token">
+        SELECT * FROM vn_auth_token WHERE token = #{token}
+    </select>
+
+    <delete id="delete_token">
+        DELETE FROM vn_auth_token WHERE token = #{token}
+    </delete>
+
+</mapper>

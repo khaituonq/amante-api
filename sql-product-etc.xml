@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="product-etc">
+	<!-- product etc -->
+
+
+
+	<!-- sample -->
+	<select id="testBasic">
+		SELECT name, category, price FROM fruits WHERE category = 'apple' AND <![CDATA[ price < 500 ]]> 
+	</select>
+
+
+	
+	<select id="CategoryMainList">
+		SELECT * FROM wt_category 
+		WHERE 
+			use_yn = 'Y'
+			and LEVEL = 1
+		ORDER BY od asc
+	</select>
+
+
+
+	
+	<select id="CategoryBestList">
+		SELECT * FROM wt_category 
+		WHERE 
+			use_yn = 'Y'
+			and best_yn = 'Y'
+			and LEVEL = 1
+		ORDER BY best_od asc
+	</select>
+
+
+	
+	
+	<select id="CategoryNewList">
+		SELECT * FROM wt_category 
+		WHERE 
+			use_yn = 'Y'
+			and new_yn = 'Y'
+			and LEVEL = 1
+		ORDER BY new_od asc
+	</select>
+
+
+
+	<select id="BannerList">
+		SELECT a.code_nm2 banner_type, b.*
+		FROM
+			wt_code2 a,
+			wt_banner b 
+		WHERE 
+			a.code_cd2 = b.banner_cd
+			and b.use_yn = 'Y'
+			and now() between b.display_Sdate and b.display_Edate
+			<if test="banner_cd != null and banner_cd != ''">
+				and b.banner_cd = ${banner_cd}
+			</if>
+		ORDER BY od ASC
+	</select>
+
+
+
+
+
+
+
+	
+
+	
+	<select id="GroupList">
+		SELECT * FROM wt_group
+		WHERE 
+			use_yn = 'Y'
+		ORDER BY od asc
+	</select>
+
+
+	
+
+
+
+	<select id="GroupProductCount">
+		SELECT 
+			count(gpro.group_cd) cnt
+		FROM 
+			wt_group_product gpro,
+			wt_product pro
+		WHERE 
+			gpro.product_cd = pro.product_cd
+			and gpro.use_yn = 'Y'
+			and pro.product_type = 'N'
+			and pro.product_state = '2'
+			/* and pro.group_yn = 'Y' */
+			and pro.del_yn = 'N'
+			<if test="category1_cd != null and category1_cd != ''">
+				and gpro.category1_cd = #{category1_cd}
+			</if>
+			<if test="category2_cd != null and category2_cd != ''">
+				and gpro.category2_cd = #{category2_cd}
+			</if>
+			<if test="category3_cd != null and category3_cd != ''">
+				and gpro.category3_cd = #{category3_cd}
+			</if>
+
+			
+			<if test="group_cd != null and group_cd != ''">
+				and gpro.group_cd = #{group_cd}
+			</if>
+	</select>
+	
+	<select id="GroupProductList">
+		SELECT A.group_cd, A.product_cd, A.product_nm,  A.category1_cd,  A.category2_cd, 
+       			A.category3_cd, A.apply_discount_yn, A.apply_discount_date, A.sale_state, B.product_code,
+       			B.product_type, B.product_state, B.brand_cd, B.group_yn, B.product_nm,
+       			B.supply_price, B.sale_price, B.fee_rate, B.reserve_rate,
+       			B.icon, B.point, B.discount_gb,
+       			( SELECT file_nm FROM wt_product_file WHERE product_cd = A.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) product_main_img,
+       			CASE WHEN B.group_yn = 'Y' THEN ifnull(D.review_cnt, 0) ELSE ifnull(C.review_cnt, 0) END review_cnt
+               
+				<if test="cust_seq != null">
+					, CASE WHEN IFNULL((SELECT count(*) FROM wt_wishlist WHERE product_cd = B.product_cd AND cust_seq = #{cust_seq}), 0) = 0 THEN 'N' ELSE 'Y' END AS wish_click_on
+				</if>
+				<if test="cust_seq == null">
+					, 'N' wish_click_on
+				</if>
+  			    FROM wt_group_product A INNER JOIN wt_product B ON A.product_cd = B.product_cd
+                          LEFT JOIN (SELECT product_cd, count(*) review_cnt
+                                       FROM wt_use_review 
+                                      WHERE use_yn = 'Y'
+                                      GROUP BY product_cd
+                                    ) C ON A.product_cd = C.product_cd AND B.group_yn = 'N'
+                          LEFT JOIN (SELECT AA.product_cd, count(*) review_cnt
+                                       FROM wt_product_set AA LEFT JOIN wt_use_review BB ON AA.set_product_cd = BB.product_cd
+                                      WHERE BB.use_yn = 'Y'
+                                      GROUP BY AA.product_cd
+                                    ) D ON A.product_cd = C.product_cd AND B.group_yn = 'Y'        
+		WHERE 
+			A.product_cd = B.product_cd
+			and A.use_yn = 'Y'
+			and B.product_type = 'N'
+			and B.product_state = '2'
+			/* and B.group_yn = 'Y' */
+			and B.del_yn = 'N'
+			<if test="category1_cd != null and category1_cd != ''">
+				and A.category1_cd = #{category1_cd}
+			</if>
+			<if test="category2_cd != null and category2_cd != ''">
+				and A.category2_cd = #{category2_cd}
+			</if>
+			<if test="category3_cd != null and category3_cd != ''">
+				and A.category3_cd = #{category3_cd}
+			</if>
+
+			
+			<if test="group_cd != null and group_cd != ''">
+				and A.group_cd = #{group_cd}
+			</if>
+
+		ORDER BY B.od asc, A.od asc, A.group_product_seq asc
+	</select>
+
+	<select id="CategoryList">
+		SELECT category_cd, category_m_cd, category_nm, category_eng_nm, od, use_yn, best_yn, new_yn, LEVEL, file_nm1, file_nm2
+		FROM wt_category 
+		WHERE use_yn = 'Y'
+		<if test="category_m_cd != null and category_m_cd != ''">
+				and category_m_cd = #{category_m_cd}
+		</if>
+		
+		ORDER BY od asc
+	</select>
+
+
+	<select id="get_banner_list_New">
+		SELECT A.code_nm2 banner_type,
+               CASE WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/special/special_product_view%' THEN 1 #기획전 상세페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/concept_room/concept_room_view%' THEN 2 #컨셉룸 상세페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/product/product_view%' THEN 3 #상품 상세페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/product/best_product_lists%' THEN 4 #베스트리스트 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/product/new_product_lists%' THEN 5 #신상품리스트 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/product/product_lists%' THEN 6 #카테고리 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/search_product/search_product_lists%' THEN 7 #검색/검색어 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/sale/sale_product_lists%' THEN 8 #SALE 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/community/sponsorship_list%' THEN 9 #커뮤니티 > 협찬 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/event/promotion_view%' THEN 10 #이벤트 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/pet/pet_product_lists%' THEN 11 #애견용품
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/sale/sale_product_lists%' THEN 12 #핫딜
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/concept_room/concept_room_lists%' THEN 12 #컨셉룸리스트            
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/special/special_product_lists%' THEN 13 #기획전리스트
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop/product/shopping_home%' THEN 14 #쇼핑홈
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') = '/shop/community/benefit' THEN 15 #커뮤니티 > 회원혜택 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') = '/shop/review/review_lists' THEN 16 #커뮤니티 > 리뷰당첨자
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') = '/shop/housewarming/housewarming_write' THEN 17 #커뮤니티 > 아망떼집들이
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') = 'https://brand.naver.com/amante' THEN 18 #외부 거래처 행사 페이지
+                    WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') = 'https://www.instagram.com/amante_home/' THEN 19 #아망떼 인스타그램
+                    ELSE 0  #찾을 수 없음
+               END landing_type,
+               CASE WHEN REPLACE(B.link, 'https://www.amante.co.kr', '') LIKE '/shop%'
+                     AND LENGTH(REPLACE(B.link, 'https://www.amante.co.kr', '')) - LENGTH(REPLACE(REPLACE(B.link, 'https://www.amante.co.kr', ''), '?', '')) = 1
+                    THEN SUBSTRING_INDEX(REPLACE(B.link, 'https://www.amante.co.kr', ''), '?', -1)
+                    ELSE ''
+               END landing_value,
+               B.*
+		 FROM wt_code2 A INNER JOIN wt_banner B ON A.code_cd2 = B.banner_cd
+		WHERE A.code_cd2 = #{code_cd2}
+			AND B.use_yn = 'Y'
+			AND NOW() BETWEEN B.display_Sdate AND B.display_Edate
+		<if test="web_use_yn != null and web_use_yn != ''">
+			and B.web_use_yn = ${web_use_yn}
+		</if>
+		<if test="and_use_yn != null and and_use_yn != ''">
+			and B.web_use_yn = ${and_use_yn}
+		</if>
+		<if test="ios_use_yn != null and ios_use_yn != ''">
+			and B.web_use_yn = ${ios_use_yn}
+		</if>
+
+		ORDER BY B.banner_cd, B.od;
+ 	</select>
+
+
+
+	<select id="get_product_cate_banner">
+		SELECT 
+			* 
+		FROM wt_banner
+		WHERE 
+			banner_cd = '112'
+			AND display_Sdate <![CDATA[ < ]]> now()
+			AND display_Edate <![CDATA[ > ]]> now()
+			AND use_yn ='Y'
+			<if test="category1_cd != null and category1_cd != ''">
+				AND category1_cd = #{category1_cd}
+			</if>
+			<if test="category2_cd != null and category2_cd != ''">
+				AND category2_cd = #{category2_cd}
+			</if>
+			<if test="category3_cd != null and category3_cd != ''">
+				AND category3_cd = #{category3_cd}
+			</if>
+	
+		ORDER BY od asc
+	</select>
+
+    <select id="get_group_nm">
+        SELECT group_nm from wt_group WHERE group_cd = #{group_cd}
+    </select>
+
+    <select id="get_month_hotdeal">
+        SELECT
+            tb1.display_date,
+            tb1.display_s_date,
+            tb1.display_e_date,
+            tb1.sale_limit,
+            tb1.sale_price AS group_sale_price,
+            tb1.sale_limit,
+            tb2.product_cd,
+            tb2.product_nm,
+            tb2.product_state,
+            tb2.supply_price,
+            tb2.sale_price,
+            tb2.discount_gb,
+            tb2.fee_rate,
+            tb2.product_cd,
+            tb2.icon,
+            ( SELECT file_nm FROM wt_product_file WHERE product_cd = tb2.product_cd AND opt_cd2 = '' AND file_gb = 'P' ORDER BY od LIMIT 1 ) AS product_main_img,
+            (
+            SELECT
+                sum( qty ) 
+            FROM
+                wt_order_info tb3,
+                wt_order_product tb4 
+            WHERE
+                tb3.ocode = tb4.ocode 
+                AND <![CDATA[date_format( tb3.reg_date, '%Y-%m-%d %H:%i' ) >= tb1.display_s_date ]]>
+                AND <![CDATA[date_format( tb3.reg_date, '%Y-%m-%d %H:%i' ) <= tb1.display_e_date ]]>
+                AND tb3.order_state_cd IN ( 20, 30, 35, 40 ) 
+                AND tb4.product_cd = tb2.product_cd 
+            ) AS order_count 
+        FROM
+            wt_group_product tb1,
+            wt_product tb2 
+        WHERE
+            tb1.product_cd = tb2.product_cd 
+            AND <![CDATA[date_format( tb1.display_e_date, '%Y-%m-%d %H:%i' ) >= date_format( NOW(), '%Y-%m-%d %H:%i' )]]> 
+            AND tb1.group_cd = '6001' 
+            AND tb1.use_yn = 'Y' 
+            AND tb2.product_type = 'N' 
+            AND tb2.product_state NOT IN ( '1', '3' ) 
+            AND tb2.del_yn = 'N' 
+        ORDER BY
+            tb1.display_s_date ASC,
+            tb1.od ASC	
+    </select>
+	<!--20230517 Jung, Create get Product Review List-->
+	<select id="ProductReviewList">
+		SELECT A.use_review_seq, A.cust_seq, A.user_id, A.user_nm, A.product_cd, A.reg_date, A.title, A.content, A.review_gb, A.point,
+			A.file_nm1, A.file_nm2, A.file_nm3, A.file_nm4, A.file_nm5,
+			A.photo_review_url, A.photo_review_url2, A.photo_review_url3, A.photo_review_url4, A.photo_review_url5, 
+			A.photo_review_url6,
+			A.reserved_yn,
+			IFNULL(B.comment_cnt, 0) comment_cnt,
+			IFNULL(C.like_cnt, 0) like_cnt,
+			IFNULL(C.this_like_cnt, 0) like_yn
+		FROM wt_use_review A LEFT JOIN (SELECT use_review_seq, COUNT(*) comment_cnt
+											FROM wt_use_review_comment
+										WHERE use_yn = 'Y'
+										GROUP BY use_review_seq
+										) B ON A.use_review_seq = B.use_review_seq
+							 LEFT JOIN (SELECT ref_seq, 
+                                                COUNT(*) like_cnt,
+		<if test="cust_seq != null and cust_seq != ''">
+												SUM(CASE WHEN cust_seq = #{cust_seq} THEN 1 ELSE 0 END) this_like_cnt
+		</if>
+
+		<if test="cust_seq == || and cust_seq == ''">
+												0 this_like_cnt
+		</if>
+											FROM wt_like_info
+										WHERE sort='review'
+											AND gubun ='L'
+										GROUP BY ref_seq
+										) C ON A.use_review_seq = C.ref_seq  
+		WHERE 1=1
+		<if test="product_cd != null and product_cd != ''">
+				and A.product_cd = #{product_cd}
+		</if>
+		ORDER BY od asc
+	</select>
+
+
+
+	
+</mapper>

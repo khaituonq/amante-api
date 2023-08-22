@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="coupon">
+
+
+
+
+  <select id="getCoupon">
+		SELECT
+			A.coupon_master_seq,  A.coupon_gb,  A.max_price, A.min_price, A.coupon_value, B.relation_product_cd, C.coupon_cnt, C.s_date as s_date, C.e_date, C.coupon_seq, C.title, A.down_yn
+		FROM
+			wt_coupon_master A
+		JOIN
+			wt_coupon_relation B
+		ON
+			A.coupon_master_seq = B.coupon_master_seq
+		JOIN
+			wt_coupon C
+		ON
+			B.coupon_master_seq = C.coupon_master_seq
+		WHERE
+							A.down_yn = 'Y' AND (
+			(
+				C.public_reserve_yn = 'N'
+				AND A.sale_target = 2
+				AND B.relation_product_cd = #{product_cd}
+				AND A.coupon_state = 1
+				AND C.s_date <![CDATA[ <= ]]> DATE_FORMAT(now(), '%Y-%m-%d')
+				AND C.e_date <![CDATA[ >= ]]> DATE_FORMAT(now(), '%Y-%m-%d')
+			) OR
+			(
+				C.public_reserve_yn = 'Y'
+				AND A.sale_target = 2
+				AND B.relation_product_cd = #{product_cd}
+				AND A.coupon_state = 1
+				AND C.public_s_date <![CDATA[ <= ]]> DATE_FORMAT(now(), '%Y-%m-%d')
+			) )
+	</select>
+
+
+
+
+	<select id="isMemberIssued">
+		SELECT
+			* 
+		FROM
+			wt_coupon_member 
+		WHERE
+			coupon_master_seq = #{master_seq} 
+			AND coupon_seq = #{coupon_seq}
+			AND cust_seq = #{cust_seq}
+	</select>
+
+
+
+  <select id="getCouponView">
+    SELECT *
+        , ( select coupon_use_gb from wt_coupon_master where coupon_master_seq = tb1.coupon_master_seq ) as coupon_use_gb
+    FROM wt_coupon tb1
+    WHERE tb1.coupon_seq = #{coupon_seq}
+  </select>
+
+
+
+  <select id="getCouponNumberCount">
+    SELECT count(coupon_number) as coupon_number_cnt 
+    FROM wt_coupon_number 
+    WHERE coupon_master_seq = #{coupon_master_seq}
+      AND coupon_seq= #{coupon_seq}
+      AND use_yn='N'
+  </select>
+  
+
+
+  <select id="getCouponNumber">
+    SELECT * FROM wt_coupon_number WHERE coupon_master_seq = #{coupon_master_seq}
+  </select>
+
+
+
+  <select id="getCouponNumber2">
+    SELECT coupon_number 
+    FROM wt_coupon_number 
+    WHERE coupon_master_seq = #{coupon_master_seq}
+      AND coupon_seq= ${coupon_seq}
+      AND use_yn='N' 
+    LIMIT 1
+  </select>
+
+
+
+  <select id="insertIssueCoupon">
+		INSERT INTO wt_coupon_member ( coupon_master_seq, coupon_seq, user_id, use_yn, s_date, e_date, reg_date, coupon_number, cust_seq )
+		VALUES
+			(#{coupon_master_seq}, #{coupon_seq}, #{user_id}, 'N', #{coupon_s_date}, #{coupon_e_date}, NOW(), #{coupon_number}, #{cust_seq})
+  </select>
+  
+
+
+  <select id="updateIssueCoupon">
+    UPDATE wt_coupon_number SET use_yn='Y' WHERE coupon_number = #{coupon_number}
+  </select>
+<mapper>

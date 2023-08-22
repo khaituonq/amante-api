@@ -1,0 +1,929 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="board">
+
+
+	<select id="eventCount">
+		SELECT 
+			count(ev.event_seq) cnt
+		FROM wt_event ev
+		WHERE
+			1=1
+			AND (ev.event_state = 1 or ev.event_state = 2)
+			AND (
+				(ev.s_date='0000-00-00 00:00:00' AND ev.e_date='0000-00-00 00:00:00')
+				or
+				NOW() BETWEEN ev.s_date AND ev.e_date
+			)
+			<if test="event_type != null and event_type != ''">
+				and ev.event_type = #{event_type}
+			</if>
+			<if test="event_state != null and event_state != ''">
+				and ev.event_state = #{event_state}
+			</if>
+	</select>
+
+
+	<select id="eventList">
+		SELECT 
+			ev.* 
+		FROM wt_event ev
+		WHERE
+			1=1
+			AND (ev.event_state = 1 or ev.event_state = 2)
+			AND (
+				(ev.s_date='0000-00-00 00:00:00' AND ev.e_date='0000-00-00 00:00:00')
+				or
+				NOW() BETWEEN ev.s_date AND ev.e_date
+			)
+			<if test="event_type != null and event_type != ''">
+				and ev.event_type = #{event_type}
+			</if>
+			<if test="event_state != null and event_state != ''">
+				and ev.event_state = #{event_state}
+			</if>
+		ORDER BY od
+	</select>
+
+	
+
+	<select id="eventRelationList">
+		SELECT event_seq, /* relation_product_cd */
+			pro.product_cd, pro.product_code, pro.product_type, pro.product_state,
+			pro.product_nm, pro.model_name,
+			pro.product_stock, pro.supply_price, pro.sale_price, pro.fee_rate, pro.reserve_rate, pro.icon,
+			pro.main_img, pro.sub_img1, pro.sub_img2, pro.sub_img3, pro.sub_img4,
+			proF.file_nm,
+			proF.file_gb
+		FROM
+			wt_event_relation er,
+			wt_product pro
+				left outer join (
+					select product_cd, group_concat(file_nm order by od) file_nm, group_concat(file_gb order by od) file_gb 
+					from wt_product_file pf
+					group by product_cd
+				) proF on pro.product_cd = proF.product_cd
+		WHERE
+			1=1
+			and er.relation_product_cd = pro.product_cd
+			<if test="event_seq != null and event_seq != ''">
+				and er.event_seq = #{event_seq}
+			</if>
+			<if test="eStr != null and eStr != ''">
+				and er.event_seq in (${eStr})
+			</if>
+		ORDER BY
+			er.event_seq
+	</select>
+
+
+
+	
+
+
+	<select id="eventAfterCount">
+		SELECT 
+			count(eva.event_after_seq) cnt
+		FROM wt_event_after eva
+		WHERE
+			1=1
+			AND eva.del_yn = 'N'
+			AND eva.use_yn = 'Y'
+			AND eva.event_seq = #{event_seq}
+	</select>
+
+
+	<select id="eventAfterList">
+		SELECT 
+			eva.* 
+		FROM wt_event_after eva
+		WHERE
+			1=1
+			AND eva.del_yn = 'N'
+			AND eva.use_yn = 'Y'
+			AND eva.event_seq = #{event_seq}
+		ORDER BY od
+	</select>
+
+
+	
+	<select id="indexWinnerList">
+		SELECT 
+			event_after_seq, event_seq, title, view_cnt, tester_recomm_cnt, LEFT(reg_date, 10) AS reg_date  
+		FROM wt_event_after 
+		ORDER BY od DESC, reg_date DESC
+		LIMIT 0,3
+	</select>
+
+
+	
+
+
+	<select id="eventBoardCount">
+		SELECT 
+			count(evb.event_board_seq) cnt
+		FROM wt_event_board evb
+		WHERE
+			1=1
+			AND evb.use_yn = 'Y'
+			AND evb.event_seq = #{event_seq}
+			<if test="admin_reply_yn != null and admin_reply_yn != ''">
+				and evb.admin_reply_yn = #{admin_reply_yn}
+			</if>
+			<if test="winner_yn != null and winner_yn != ''">
+				and evb.winner_yn = #{winner_yn}
+			</if>
+	</select>
+
+
+	<select id="eventBoardList">
+		SELECT 
+			evb.* 
+		FROM wt_event_board evb
+		WHERE
+			1=1
+			AND evb.use_yn = 'Y'
+			AND evb.event_seq = #{event_seq}
+			<if test="admin_reply_yn != null and admin_reply_yn != ''">
+				and evb.admin_reply_yn = #{admin_reply_yn}
+			</if>
+			<if test="winner_yn != null and winner_yn != ''">
+				and evb.winner_yn = #{winner_yn}
+			</if>
+		ORDER BY evb.event_board_seq
+	</select>
+
+
+	
+
+	<select id="eventRecommCount">
+		SELECT 
+			count(evr.recomm_seq) cnt
+		FROM wt_event_recomm evr
+		WHERE
+			1=1
+			AND evr.event_seq = #{event_seq}
+			AND evr.event_board_seq = #{event_board_seq}
+			<if test="admin_reply_yn != null and admin_reply_yn != ''">
+				and evr.admin_reply_yn = #{admin_reply_yn}
+			</if>
+			<if test="user_id != null and user_id != ''">
+				and evr.user_id = #{user_id}
+			</if>
+			<if test="user_nm != null and user_nm != ''">
+				and evr.user_nm = #{user_nm}
+			</if>
+			<if test="email != null and email != ''">
+				and evr.email = #{email}
+			</if>
+	</select>
+
+
+	<select id="eventRecommList">
+		SELECT 
+			evr.* 
+		FROM wt_event_recomm evr
+		WHERE
+			1=1
+			AND evr.event_seq = #{event_seq}
+			AND evr.event_board_seq = #{event_board_seq}
+			<if test="recomm_yn != null and recomm_yn != ''">
+				and evr.recomm_yn = #{recomm_yn}
+			</if>
+			<if test="user_id != null and user_id != ''">
+				and evr.user_id = #{user_id}
+			</if>
+			<if test="user_nm != null and user_nm != ''">
+				and evr.user_nm = #{user_nm}
+			</if>
+			<if test="email != null and email != ''">
+				and evr.email = #{email}
+			</if>
+		ORDER BY evr.recomm_seq
+	</select>
+
+
+
+
+
+
+
+
+
+
+
+	<select id="conceptRommCount">
+		SELECT 
+			count(cr.concept_room_seq) cnt
+		FROM wt_concept_room cr
+		WHERE
+			1=1
+			AND cr.use_yn = 'Y'
+			<if test="brand_cd != null and brand_cd != ''">
+				and cr.brand_cd = #{brand_cd}
+			</if>
+			<if test="state != null and state != ''">
+				and cr.state = #{state}
+			</if>
+			<if test="house_type != null and house_type != ''">
+				and cr.house_type = #{house_type}
+			</if>
+			<if test="space != null and space != ''">
+				and cr.space = #{space}
+			</if>
+			<if test="style != null and style != ''">
+				and cr.style = #{style}
+			</if>
+			<if test="size != null and size != ''">
+				and cr.size = #{size}
+			</if>
+	</select>
+
+
+	<select id="conceptRommList">
+		SELECT 
+			cr.* 
+		FROM wt_concept_room cr
+		WHERE
+			1=1
+			AND cr.use_yn = 'Y'
+			<if test="brand_cd != null and brand_cd != ''">
+				and cr.brand_cd = #{brand_cd}
+			</if>
+			<if test="state != null and state != ''">
+				and cr.state = #{state}
+			</if>
+			<if test="house_type != null and house_type != ''">
+				and cr.house_type = #{house_type}
+			</if>
+			<if test="space != null and space != ''">
+				and cr.space = #{space}
+			</if>
+			<if test="style != null and style != ''">
+				and cr.style = #{style}
+			</if>
+			<if test="size != null and size != ''">
+				and cr.size = #{size}
+			</if>
+		ORDER BY cr.od
+	</select>
+
+
+
+
+
+	
+	<select id="conceptRommProductList">
+		SELECT *
+		FROM
+			wt_concept_room_product crp
+		WHERE
+			1=1
+			<if test="concept_room_seq != null and concept_room_seq != ''">
+				and crp.concept_room_seq = #{concept_room_seq}
+			</if>
+			<if test="crpStr != null and crpStr != ''">
+				and crp.concept_room_seq in (${crpStr})
+			</if>
+		ORDER BY
+			crp.concept_room_seq, seq asc
+	</select>
+
+
+
+
+
+
+	
+	<select id="conceptRoomRecommCount">
+		SELECT 
+			count(crr.event_recomm_seq) cnt
+		FROM wt_concept_room_recomm crr
+		WHERE
+			1=1
+			AND crr.concept_room_seq = #{concept_room_seq}
+			AND crr.event_board_seq = #{event_board_seq}
+			<if test="recomm_yn != null and recomm_yn != ''">
+				and crr.recomm_yn = #{recomm_yn}
+			</if>
+			<if test="user_id != null and user_id != ''">
+				and crr.user_id = #{user_id}
+			</if>
+			<if test="user_nm != null and user_nm != ''">
+				and crr.user_nm = #{user_nm}
+			</if>
+			<if test="email != null and email != ''">
+				and crr.email = #{email}
+			</if>
+	</select>
+
+
+	<select id="conceptRoomRecommList">
+		SELECT 
+			crr.* 
+		FROM wt_concept_room_recomm crr
+		WHERE
+			1=1
+			AND crr.concept_room_seq = #{concept_room_seq}
+			AND crr.event_board_seq = #{event_board_seq}
+			<if test="recomm_yn != null and recomm_yn != ''">
+				and crr.recomm_yn = #{recomm_yn}
+			</if>
+			<if test="user_id != null and user_id != ''">
+				and crr.user_id = #{user_id}
+			</if>
+			<if test="user_nm != null and user_nm != ''">
+				and crr.user_nm = #{user_nm}
+			</if>
+			<if test="email != null and email != ''">
+				and crr.email = #{email}
+			</if>
+		ORDER BY crr.event_recomm_seq
+	</select>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<select id="housewarmingCount">
+		SELECT 
+			count(h.event_seq) cnt
+		FROM wt_housewarming h
+		WHERE
+			1=1
+			AND h.use_yn = 'Y'
+			AND h.del_yn = 'N'
+			
+			<if test="event_nm != null and event_nm != ''">
+				and (h.event_nm = #{event_nm} or h.event_nm like '%${event_nm}$' or h.event_nm like '%${event_nm}' or h.event_nm like '${event_nm}%' )
+			</if>
+
+			<if test="event_con != null and event_con != ''">
+				and h.event_con = #{event_con}
+			</if>
+			<if test="site_gb != null and site_gb != ''">
+				and h.site_gb = #{site_gb}
+			</if>
+			<if test="event_type != null and event_type != ''">
+				and h.event_type = #{event_type}
+			</if>
+	</select>
+
+
+	<select id="housewarmingList">
+		SELECT 
+			h.* 
+		FROM wt_housewarming h
+		WHERE
+			1=1
+			AND h.use_yn = 'Y'
+			AND h.del_yn = 'N'
+			
+			<if test="event_nm != null and event_nm != ''">
+				and (h.event_nm = #{event_nm} or h.event_nm like '%${event_nm}$' or h.event_nm like '%${event_nm}' or h.event_nm like '${event_nm}%' )
+			</if>
+
+			<if test="event_con != null and event_con != ''">
+				and h.event_con = #{event_con}
+			</if>
+			<if test="site_gb != null and site_gb != ''">
+				and h.site_gb = #{site_gb}
+			</if>
+			<if test="event_type != null and event_type != ''">
+				and h.event_type = #{event_type}
+			</if>
+            <if test="main_yn != null and main_yn != ''">
+                and h.main_yn = #{main_yn}
+            </if>
+		ORDER BY h.od
+	</select>
+
+	<select id="housewarmingRelationList">
+		SELECT event_seq, relation_product_cd
+		FROM
+			wt_housewarming_relation er
+		WHERE
+			1=1
+			<if test="event_seq != null and event_seq != ''">
+				and er.event_seq = #{event_seq}
+			</if>
+			<if test="eStr != null and eStr != ''">
+				and er.event_seq in (${eStr})
+			</if>
+		ORDER BY
+			er.event_seq
+	</select>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<select id="themeCount">
+		SELECT 
+			count(th.theme_seq) cnt
+		FROM wt_theme th
+		WHERE
+			1=1
+			AND th.use_yn = 'Y'
+			AND th.del_yn = 'N'
+			AND (th.theme_state = 1 or th.theme_state = 2)
+			AND (
+				NOW() BETWEEN th.s_date AND th.e_date
+			)
+			
+			<if test="site_gb != null and site_gb != ''">
+				and th.site_gb = #{site_gb}
+			</if>
+			<if test="theme_type != null and theme_type != ''">
+				and th.theme_type = #{theme_type}
+			</if>
+			<if test="theme_state != null and theme_state != ''">
+				and th.theme_state = #{theme_state}
+			</if>
+			<if test="main_yn != null and main_yn != ''">
+				and th.main_yn = #{main_yn}
+			</if>
+			<if test="shopping_yn != null and shopping_yn != ''">
+				and th.shopping_yn = #{shopping_yn}
+			</if>
+			<if test="gubun_yn != null and gubun_yn != ''">
+				and th.gubun_yn = #{gubun_yn}
+			</if>
+	</select>
+
+
+	<select id="themeList">
+		SELECT 
+			th.* 
+		FROM wt_theme th
+		WHERE
+			1=1
+			AND th.use_yn = 'Y'
+			AND th.del_yn = 'N'
+			AND (th.theme_state = 1 or th.theme_state = 2)
+			AND (
+				NOW() BETWEEN th.s_date AND th.e_date
+			)
+			
+			<if test="site_gb != null and site_gb != ''">
+				and th.site_gb = #{site_gb}
+			</if>
+			<if test="theme_type != null and theme_type != ''">
+				and th.theme_type = #{theme_type}
+			</if>
+			<if test="theme_state != null and theme_state != ''">
+				and th.theme_state = #{theme_state}
+			</if>
+			<if test="main_yn != null and main_yn != ''">
+				and th.main_yn = #{main_yn}
+			</if>
+			<if test="shopping_yn != null and shopping_yn != ''">
+				and th.shopping_yn = #{shopping_yn}
+			</if>
+			<if test="gubun_yn != null and gubun_yn != ''">
+				and th.gubun_yn = #{gubun_yn}
+			</if>
+		ORDER BY od
+	</select>
+
+
+	<select id="themeRelationList">
+		SELECT 
+			tr.theme_seq, /*tr.relation_product_cd,*/
+			pro.product_cd, pro.product_code, pro.product_type, pro.product_state,
+			pro.product_nm, pro.model_name,
+			pro.product_stock, pro.supply_price, pro.sale_price, pro.fee_rate, pro.reserve_rate, pro.icon,
+			pro.main_img, pro.sub_img1, pro.sub_img2, pro.sub_img3, pro.sub_img4,
+			proF.file_nm,
+			proF.file_gb
+		FROM
+			wt_theme_relation tr,
+			wt_product pro
+				left outer join (
+					select product_cd, group_concat(file_nm order by od) file_nm, group_concat(file_gb order by od) file_gb 
+					from wt_product_file pf
+					group by product_cd
+				) proF on pro.product_cd = proF.product_cd
+		WHERE
+			1=1
+			and tr.relation_product_cd = pro.product_cd
+			<if test="theme_seq != null and theme_seq != ''">
+				and tr.theme_seq = #{theme_seq}
+			</if>
+			<if test="tStr != null and tStr != ''">
+				and tr.theme_seq in (${tStr})
+			</if>
+		ORDER BY
+			tr.theme_seq
+	</select>
+
+
+
+	
+
+	<select id="themeRecommCount">
+		SELECT 
+			count(trr.theme_recomm_seq) cnt
+		FROM wt_theme_recomm trr
+		WHERE
+			1=1
+			AND trr.theme_seq = #{theme_seq}
+			AND trr.theme_board_seq = #{theme_board_seq}
+			<if test="recomm_yn != null and recomm_yn != ''">
+				and trr.recomm_yn = #{recomm_yn}
+			</if>
+			<if test="user_id != null and user_id != ''">
+				and trr.user_id = #{user_id}
+			</if>
+			<if test="user_nm != null and user_nm != ''">
+				and trr.user_nm = #{user_nm}
+			</if>
+			<if test="email != null and email != ''">
+				and trr.email = #{email}
+			</if>
+	</select>
+
+	<select id="themeRecommList">
+		SELECT 
+			trr.* 
+		FROM wt_theme_recomm trr
+		WHERE
+			1=1
+			AND trr.theme_seq = #{theme_seq}
+			AND trr.theme_board_seq = #{theme_board_seq}
+			<if test="recomm_yn != null and recomm_yn != ''">
+				and trr.recomm_yn = #{recomm_yn}
+			</if>
+			<if test="user_id != null and user_id != ''">
+				and trr.user_id = #{user_id}
+			</if>
+			<if test="user_nm != null and user_nm != ''">
+				and trr.user_nm = #{user_nm}
+			</if>
+			<if test="email != null and email != ''">
+				and trr.email = #{email}
+			</if>
+		ORDER BY trr.theme_recomm_seq
+	</select>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<select id="faq-get_list">
+		SELECT
+			*,
+			( SELECT code_nm2 FROM wt_code2 WHERE code_cd2 = wt_board.code_gb ) AS code_nm2
+		FROM
+			wt_board
+		WHERE
+			sort = 'faq'
+			AND wt_board.show = 'Y'
+			AND del = 'N'
+			AND NO > '0'
+			<if test="key != '' && keyword != '' && key != 'all'">
+				AND ${key} like '%${keyword}%' ESCAPE '!'
+			</if>
+			<if test="key == 'all' && keyword != ''">
+				AND ( title LIKE '%${keyword}%' OR content LIKE '%${keyword}%' ESCAPE '!' )
+			</if>
+			<if test="category != 'all'">
+				AND code_gb = #{category}
+			</if>
+		ORDER BY
+			od ASC
+		LIMIT ${start_num}, ${row_count}
+	</select>
+
+	<select id="faq-getCode">
+		SELECT
+			code_cd2,
+			code_nm2
+		FROM
+			wt_code2
+		WHERE
+			code_cd1 = '300'
+			AND use_yn = 'Y'
+		ORDER BY
+			od ASC
+	</select>
+
+
+	<select id="faq-index_faq_list">
+		SELECT NO, code_gb, title 
+		FROM wt_board 
+		WHERE 
+			sort ='faq' 
+			AND wt_board.show ='Y' 
+			AND del = 'N'
+			AND NO > '0' 
+		ORDER BY od DESC, no DESC
+	</select>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	<select id="qna-getCode">
+		SELECT
+			code_cd2,
+			code_nm2
+		FROM
+			wt_code2
+		WHERE
+			code_cd1 = '700'
+			AND use_yn = 'Y'
+		ORDER BY
+			od ASC
+	</select>
+
+	<insert id="qna-store">
+		/* $this->db->insert('wt_board', $arrays); */
+		insert into wt_board()
+		values()
+	</insert>
+
+
+	<select id="qna-get_list">
+		SELECT
+			*,
+			( SELECT code_nm2 FROM wt_code2 WHERE code_cd2 = wt_board.code_gb ) AS code_nm2
+		FROM
+			wt_board
+		WHERE
+			sort = 'counsel'
+			AND wt_board.show = 'Y'
+			AND del = 'N'
+			AND NO > '0'
+			<if test="key != '' && keyword != '' && key != 'all'">
+				AND ${key} like '%${keyword}%' ESCAPE '!'
+			</if>
+			<if test="key == 'all' && keyword != ''">
+				AND ( title LIKE '%${keyword}%' OR content LIKE '%${keyword}%' ESCAPE '!' )
+			</if>
+			<if test="category != 'all'">
+				AND code_gb = #{category}
+			</if>
+		ORDER BY
+			od ASC
+		LIMIT ${start_num}, ${row_count}
+	</select>
+
+	<update id="qna-update_hit">
+		UPDATE wt_board
+		set hit = hit + 1
+		where
+			no = #{no}
+	</update>
+
+	<select id="qna-get_view">
+		SELECT *
+		FROM wt_board
+		WHERE sort = 'counsel'
+			AND wt_board.show = 'Y'
+			AND del = 'N'
+			AND NO = #{no}
+	</select>
+
+	<select id="qna-index_qna_list">
+		SELECT 
+			NO, code_gb, title, writer, writer_id 
+		FROM wt_board 
+		WHERE 
+			sort ='counsel' 
+			AND wt_board.show ='Y' 
+		ORDER BY no DESC LIMIT 0,3
+	</select>
+
+	<select id="qna-getProductCount">
+		SELECT * 
+		FROM wt_board 
+		WHERE 
+			product_cd = #{code} 
+			AND del = 'N' 
+			AND wt_board.show = 'Y'
+	</select>
+
+	<select id="qna-getProductQnalist">
+		SELECT
+			wt_board.*, tb2.code_nm2
+		FROM
+			wt_board, wt_code2 tb2
+		WHERE
+			tb2.code_cd2 = wt_board.code_gb AND
+			sort = 'counsel' AND
+			product_cd = #{code} AND
+			del = 'N' AND
+			wt_board.show = 'Y'
+		ORDER BY
+			od ASC
+		LIMIT ${start_num}, ${row_count}
+	</select>
+
+	<!--
+	## 내 qna 리스트 보기
+	-->
+	<select id="qna-get_my_qna_list">
+		SELECT
+			*, ( SELECT code_nm2 FROM wt_code2 WHERE code_cd2 = wt_board.code_gb ) AS code_nm2
+		FROM wt_board
+		WHERE
+			sort = 'counsel'
+			AND wt_board.show = 'Y'
+			AND del = 'N'
+			AND cust_seq = #{cust_seq}
+	</select>
+
+
+	<!--
+	## 문의 삭제 -> del 만 Y 값으로 변경
+	-->
+	<update id="qna-del_qna">
+		UPDATE wt_board
+		set
+			del = 'Y'
+		where
+			sort = 'counsel'
+			and cust_seq = #{cust_seq}
+			and no = #{no}
+	</update>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<select id="tip-get_total">
+		SELECT count(*) as count
+		FROM wt_tip tb1
+		WHERE 1=1
+			and use_yn = 'Y'
+			and del_yn = 'N'
+	</select>
+
+	<!--
+	/**
+     * 집들이 리스트 불러오기
+     * @param  [type] $arrays    [description]
+     * @param  [type] $row_count [description]
+     * @param  [type] $start_num [description]
+     */
+	-->
+	<select id="tip-get_list">
+		SELECT tb1.*
+			,(select count(*) from wt_comment where wno = tb1.event_seq and sort = 'tip' ) comm_cnt
+			,(SELECT COUNT(*) FROM wt_like_info WHERE ref_seq = tb1.event_seq AND gubun = 'L' AND sort='tip' ) AS like_cnt
+		FROM wt_tip tb1
+		WHERE 1=1
+			and use_yn = 'Y'
+			and del_yn = 'N'
+		ORDER BY tb1.od desc, tb1.event_seq DESC
+		 <if test="start_num >= 0 && row_count > 0">
+                LIMIT ${start_num}, ${row_count}
+            </if>
+	</select>
+
+	<!--
+	/**
+     * 정보 불러오기
+     * @param  [type] $product_cd [description]
+     * @return [type]             [description]
+     */
+	-->
+	<update id="tip-get_view1">
+		UPDATE wt_tip 
+		SET hit = hit+1 
+		WHERE event_seq = #{event_seq}
+	</update>
+
+	<select id="tip-get_view">
+		SELECT tb1.*
+			,(select count(*) from wt_comment where wno = tb1.event_seq and sort = 'tip' ) comm_cnt
+			,(SELECT COUNT(*) FROM wt_like_info WHERE ref_seq = tb1.event_seq AND gubun = 'L' AND sort='tip' ) AS like_cnt
+		FROM wt_tip tb1
+		WHERE 1=1
+			and use_yn = 'Y'
+			and del_yn = 'N'
+			AND tb1.event_seq = #{event_seq}
+	</select>
+
+	<select id="tip-getList">
+		SELECT
+			event_seq, event_nm, content, hit, writer_id, file_nm1,
+			( SELECT COUNT(*) FROM wt_comment WHERE wt_event.event_seq = wt_comment.wno AND sort=? ) AS 'comment_cnt'
+		FROM
+			wt_event
+		WHERE
+			use_yn = 'Y'
+			AND del_yn = 'N'
+			AND sort   = 'tip'
+		ORDER BY
+			od desc, event_seq DESC
+		LIMIT ${start_num}, ${row_count}
+	</select>
+
+	<select id="tip-getView">
+		SELECT
+			event_nm, content,  date_format(reg_date,'%Y-%m-%d') as reg_date, hit, writer_id, file_nm1
+		FROM
+			wt_event
+		WHERE
+			event_seq	= #{event_seq} 
+			AND del_yn		= 'N'
+			AND use_yn		= 'Y'
+			AND sort		= 'tip'
+	</select>
+
+	<update id="tip-update_hit">
+		update wt_event
+		set hit = hit + 1
+		where
+			event_seq = #{event_seq}
+	</update>
+
+
+
+	<select id="tip-user_like_yn">
+		SELECT COUNT(*) as cnt 
+		FROM wt_like_info 
+		WHERE 
+			sort = #{sort}
+			AND ref_seq = #{ref_seq}
+			AND cust_seq = #{cust_seq}
+	</select>
+
+
+
+	<select id="index_notice_list">
+		SELECT NO, code_gb, title, writer, writer_id, notice
+		FROM wt_board
+		WHERE 
+			sort = 'notice'
+			AND wt_board.show = 'Y'
+			AND del= 'N'
+		ORDER BY 
+			od desc,
+			reg_date desc,
+			notice asc
+		LIMIT 0,3;
+	</select>
+
+</mapper>
